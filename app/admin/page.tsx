@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -76,40 +76,32 @@ export default function AdminPage() {
   const [pointAmount, setPointAmount] = useState("");
   const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
 
-  // 사용자 인증 및 관리자 권한 체크
   useEffect(() => {
-    const checkAuth = () => {
+    const checkAuth = async () => {
       try {
         const token = localStorage.getItem("token");
-        const storedUser = localStorage.getItem("user");
-        
-        if (!token || !storedUser) {
+        if (!token) {
           router.push("/sign-in");
           return;
         }
 
-        const user = JSON.parse(storedUser);
-        
-        // 관리자 권한 체크
-        if (user.role !== "ADMIN") {
-          toast({
-            title: "접근 거부",
-            description: "관리자만 접근할 수 있습니다.",
-            variant: "destructive",
-          });
-          router.push("/");
-          return;
-        }
-
-        fetchUsers();
-        fetchPointRequests();
-      } catch (error) {
-        router.push("/sign-in");
+        await Promise.all([
+          fetchUsers(),
+          fetchPointRequests(),
+          fetchTransactions()
+        ]);
+      } catch (error: unknown) {
+        console.error("인증 체크 에러:", error);
+        toast({
+          title: "오류",
+          description: "데이터를 불러오는데 실패했습니다.",
+          variant: "destructive",
+        });
       }
     };
 
     checkAuth();
-  }, []);
+  }, [fetchUsers, fetchPointRequests, fetchTransactions, router, toast]);
 
   // 사용자 목록 가져오기
   const fetchUsers = async () => {
@@ -447,6 +439,37 @@ export default function AdminPage() {
       setFilteredUsers([]);
     }
   }, [userSearchQuery, users]);
+
+  const handleApproveRequest = useCallback(async (requestId: string) => {
+    try {
+      const response = await fetch(`/api/point-requests/${requestId}/status`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ status: "approved" }),
+      });
+
+      if (!response.ok) throw new Error("요청 처리에 실패했습니다.");
+
+      await response.json();
+      
+      toast({
+        title: "성공",
+        description: "요청이 승인되었습니다.",
+      });
+
+      fetchPointRequests();
+      fetchTransactions();
+    } catch (error: unknown) {
+      console.error("요청 승인 에러:", error);
+      toast({
+        title: "오류",
+        description: "요청 처리 중 오류가 발생했습니다.",
+        variant: "destructive",
+      });
+    }
+  }, [fetchPointRequests, fetchTransactions, toast]);
 
   return (
     <div className="container mx-auto sm:p-4 p-0">

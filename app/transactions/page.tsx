@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -26,6 +26,14 @@ interface Transaction {
   amount: number;
   description: string;
   date: string;
+  sender?: {
+    name: string;
+    username: string;
+  };
+  receiver?: {
+    name: string;
+    username: string;
+  };
 }
 
 export default function TransactionsPage() {
@@ -102,7 +110,7 @@ export default function TransactionsPage() {
     if (user?.id) {
       fetchTransactions();
     }
-  }, [currentPage, pageSize, user?.id]);
+  }, [fetchTransactions]);
 
   const totalPages = Math.ceil(totalTransactions / Number(pageSize));
 

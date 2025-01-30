@@ -403,10 +403,10 @@ export default function HomePage() {
 
   // user 상태가 변경될 때마다 포인트 내역 새로고침
   useEffect(() => {
-    if (user) {
+    if (user?.id) {
       fetchPointHistory(user.id);
     }
-  }, [user?.points, fetchPointHistory]);
+  }, [user?.id, fetchPointHistory]);
 
   const handlePointRequest = useCallback(async () => {
     if (!user) return;
@@ -547,7 +547,7 @@ export default function HomePage() {
   }, []);
 
   const handleUsePoints = useCallback(async () => {
-    if (!selectedProduct || selectedAmount > (user?.points || 0)) {
+    if (!selectedProduct || !user?.points || selectedAmount > user.points) {
       toast({
         title: "오류",
         description: "올바른 상품을 선택하고 잔액을 확인해주세요.",
@@ -602,7 +602,7 @@ export default function HomePage() {
         variant: "destructive",
       });
     }
-  }, [selectedProduct, selectedAmount, toast, user?.id, fetchPointHistory, refreshUserInfo]);
+  }, [selectedProduct, selectedAmount, toast, user, fetchPointHistory, refreshUserInfo]);
 
   // 토큰 만료 체크
   const checkTokenExpiration = useCallback(() => {

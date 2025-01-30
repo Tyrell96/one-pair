@@ -40,7 +40,8 @@ export default function PointManagementPage() {
       if (!response.ok) throw new Error("포인트 요청을 불러올 수 없습니다.");
       const data = await response.json();
       setPointRequests(data.requests);
-    } catch (error) {
+    } catch (error: unknown) {
+      console.error("포인트 요청 에러:", error);
       toast({
         title: "오류",
         description: "포인트 요청을 불러오는데 실패했습니다.",
@@ -55,7 +56,8 @@ export default function PointManagementPage() {
       if (!response.ok) throw new Error("거래 내역을 불러올 수 없습니다.");
       const data = await response.json();
       setTransactions(data.transactions);
-    } catch (error) {
+    } catch (error: unknown) {
+      console.error("거래 내역 에러:", error);
       toast({
         title: "오류",
         description: "거래 내역을 불러오는데 실패했습니다.",
@@ -88,7 +90,8 @@ export default function PointManagementPage() {
 
       fetchPointRequests();
       fetchTransactions();
-    } catch (error) {
+    } catch (error: unknown) {
+      console.error("포인트 관리 에러:", error);
       toast({
         title: "오류",
         description: "요청 처리 중 오류가 발생했습니다.",

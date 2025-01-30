@@ -39,7 +39,8 @@ export default function PaymentPage() {
       if (!response.ok) throw new Error("딜러 목록을 불러올 수 없습니다.");
       const data = await response.json();
       setDealers(data.dealers);
-    } catch (error) {
+    } catch (error: unknown) {
+      console.error("딜러 목록 로딩 에러:", error);
       toast({
         title: "오류",
         description: "딜러 목록을 불러오는데 실패했습니다.",
@@ -97,7 +98,8 @@ export default function PaymentPage() {
       });
 
       router.push("/");
-    } catch (error) {
+    } catch (error: unknown) {
+      console.error("포인트 전달 에러:", error);
       toast({
         title: "오류",
         description: "포인트 전달 중 오류가 발생했습니다.",

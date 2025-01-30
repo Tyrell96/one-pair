@@ -61,7 +61,7 @@ export default function ProfilePage() {
         throw new Error(data.error || '프로필 업데이트에 실패했습니다.');
       }
 
-      const updatedUser = await response.json();
+      await response.json();
       
       toast({
         title: "성공",

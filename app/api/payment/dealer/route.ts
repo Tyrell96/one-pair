@@ -2,6 +2,25 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getToken } from "@/lib/auth";
 
+interface TransactionResult {
+  sender: {
+    id: string;
+    points: number;
+  };
+  receiver: {
+    id: string;
+    points: number;
+  };
+  transaction: {
+    id: string;
+    amount: number;
+    type: string;
+    senderId: string;
+    receiverId: string;
+    createdAt: Date;
+  };
+}
+
 export async function POST(request: Request) {
   try {
     const token = request.headers.get("Authorization")?.split(" ")[1];
@@ -38,7 +57,7 @@ export async function POST(request: Request) {
     }
 
     // 트랜잭션으로 포인트 전달 처리
-    const result = await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction<TransactionResult>(async (tx) => {
       // 딜러 확인
       const dealer = await tx.user.findUnique({
         where: {
@@ -101,7 +120,24 @@ export async function POST(request: Request) {
         },
       });
 
-      return { success: true };
+      return {
+        sender: {
+          id: sender.id,
+          points: sender.points,
+        },
+        receiver: {
+          id: dealer.id,
+          points: dealer.points,
+        },
+        transaction: {
+          id: "",
+          amount: amount,
+          type: "전달",
+          senderId: payload.id,
+          receiverId: dealerId,
+          createdAt: new Date(),
+        },
+      };
     });
 
     return NextResponse.json(result);

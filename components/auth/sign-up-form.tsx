@@ -43,7 +43,13 @@ export function SignUpForm() {
     }
 
     try {
-      const { passwordConfirm, ...submitData } = formData;
+      const submitData = {
+        username: formData.username,
+        password: formData.password,
+        name: formData.name,
+        email: formData.email
+      };
+      
       const response = await fetch("/api/auth/sign-up", {
         method: "POST",
         headers: {

@@ -3,8 +3,6 @@ import jwt from "jsonwebtoken";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 
-const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
-
 export async function POST(request: Request) {
   try {
     const { username, password } = await request.json();
@@ -50,7 +48,7 @@ export async function POST(request: Request) {
     }
 
     // 응답에서 비밀번호 제외
-    const { password: _, ...userWithoutPassword } = user;
+    const { password: userPassword, ...userWithoutPassword } = user;
 
     // JWT 토큰 생성
     const token = jwt.sign(

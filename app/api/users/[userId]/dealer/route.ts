@@ -1,13 +1,19 @@
-import { NextResponse } from "next/server";
+import { NextResponse, NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 
+type RouteParams = {
+  params: {
+    userId: string;
+  };
+};
+
 export async function PATCH(
-  request: Request,
-  { params }: { params: { userId: string } }
+  req: NextRequest,
+  { params }: RouteParams
 ) {
   try {
     const { userId } = params;
-    const { isDealer } = await request.json();
+    const { isDealer } = await req.json();
 
     // 사용자 딜러 상태 업데이트
     const updatedUser = await prisma.user.update({

@@ -1,13 +1,19 @@
-import { NextResponse } from "next/server";
+import { NextResponse, NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 
+type RouteParams = {
+  params: {
+    userId: string;
+  };
+};
+
 export async function PATCH(
-  request: Request,
-  { params }: { params: { userId: string } }
+  req: NextRequest,
+  { params }: RouteParams
 ) {
   try {
     const { userId } = params;
-    const { role } = await request.json();
+    const { role } = await req.json();
 
     // 권한 값 검증
     if (role !== "ADMIN" && role !== "USER") {

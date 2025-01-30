@@ -1,13 +1,19 @@
-import { NextResponse } from "next/server";
+import { NextResponse, NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 
+type RouteParams = {
+  params: {
+    requestId: string;
+  };
+};
+
 export async function POST(
-  request: Request,
-  { params }: { params: { requestId: string } }
+  req: NextRequest,
+  { params }: RouteParams
 ) {
   try {
     const { requestId } = params;
-    const { status } = await request.json();
+    const { status } = await req.json();
 
     // 요청 정보 조회
     const pointRequest = await prisma.pointRequest.findUnique({

@@ -1,18 +1,17 @@
-import { NextResponse } from "next/server";
+import { NextResponse, NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 
-type RequestContext = {
+type RouteParams = {
   params: {
     userId: string;
   };
-  searchParams: { [key: string]: string | string[] | undefined };
 };
 
 // 사용자 삭제
 export async function DELETE(
-  request: Request,
-  { params }: { params: { userId: string } }
+  req: NextRequest,
+  { params }: RouteParams
 ) {
   try {
     const { userId } = params;
@@ -35,12 +34,12 @@ export async function DELETE(
 
 // 비밀번호 초기화
 export async function PATCH(
-  request: Request,
-  { params }: { params: { userId: string } }
+  req: NextRequest,
+  { params }: RouteParams
 ) {
   try {
     const { userId } = params;
-    const { action } = await request.json();
+    const { action } = await req.json();
 
     if (action === "resetPassword") {
       // 임시 비밀번호 생성 (예: "User@" + 랜덤 6자리 숫자)

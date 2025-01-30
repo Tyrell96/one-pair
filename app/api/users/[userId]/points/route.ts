@@ -1,13 +1,19 @@
-import { NextResponse } from "next/server";
+import { NextResponse, NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 
+type RouteParams = {
+  params: {
+    userId: string;
+  };
+};
+
 export async function POST(
-  request: Request,
-  { params }: { params: { userId: string } }
+  req: NextRequest,
+  { params }: RouteParams
 ) {
   try {
     const { userId } = params;
-    const { action, amount } = await request.json();
+    const { action, amount } = await req.json();
 
     // 사용자 확인
     const user = await prisma.user.findUnique({

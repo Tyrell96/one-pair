@@ -203,10 +203,11 @@ export default function AdminPage() {
       });
 
       fetchUsers();
-    } catch (error) {
+    } catch (error: unknown) {
+      console.error("권한 변경 에러:", error);
       toast({
         title: "오류",
-        description: "권한 변경에 실패했습니다.",
+        description: error instanceof Error ? error.message : "권한 변경에 실패했습니다.",
         variant: "destructive",
       });
     } finally {
@@ -214,55 +215,36 @@ export default function AdminPage() {
     }
   };
 
+  // 포인트 요청 처리
   const handlePointRequest = async (requestId: string, status: 'approved' | 'rejected') => {
-    setIsLoading(true);
     try {
-      const token = localStorage.getItem("token");
       const response = await fetch(`/api/point-requests/${requestId}/status`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({ status }),
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "요청 처리에 실패했습니다.");
-      }
-
-      // 포인트 요청이 승인되고, 현재 로그인한 사용자의 요청인 경우 로컬 스토리지 업데이트
-      if (status === 'approved' && data.user) {
-        const storedUser = localStorage.getItem('user');
-        if (storedUser) {
-          const currentUser = JSON.parse(storedUser);
-          if (currentUser.id === data.user.id) {
-            localStorage.setItem('user', JSON.stringify(data.user));
-          }
-        }
-      }
+      if (!response.ok) throw new Error("요청 처리에 실패했습니다.");
 
       toast({
-        title: "처리 완료",
-        description: data.message,
+        title: "성공",
+        description: `요청이 ${status === 'approved' ? '승인' : '거절'}되었습니다.`,
       });
 
-      // 데이터 새로고침
+      // 포인트 요청 목록과 거래 내역 새로고침
       await Promise.all([
         fetchPointRequests(),
-        status === 'approved' && fetchUsers(),
-      ].filter(Boolean));
-    } catch (error) {
-      console.error('포인트 요청 처리 에러:', error);
+        fetchTransactions()
+      ]);
+    } catch (error: unknown) {
+      console.error("포인트 요청 처리 에러:", error);
       toast({
         title: "오류",
-        description: error instanceof Error ? error.message : "요청 처리에 실패했습니다.",
+        description: error instanceof Error ? error.message : "요청 처리 중 오류가 발생했습니다.",
         variant: "destructive",
       });
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -426,37 +408,6 @@ export default function AdminPage() {
       setFilteredUsers([]);
     }
   }, [userSearchQuery, users]);
-
-  const handleApproveRequest = useCallback(async (requestId: string) => {
-    try {
-      const response = await fetch(`/api/point-requests/${requestId}/status`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ status: "approved" }),
-      });
-
-      if (!response.ok) throw new Error("요청 처리에 실패했습니다.");
-
-      await response.json();
-      
-      toast({
-        title: "성공",
-        description: "요청이 승인되었습니다.",
-      });
-
-      fetchPointRequests();
-      fetchTransactions();
-    } catch (error: unknown) {
-      console.error("요청 승인 에러:", error);
-      toast({
-        title: "오류",
-        description: "요청 처리 중 오류가 발생했습니다.",
-        variant: "destructive",
-      });
-    }
-  }, [fetchPointRequests, fetchTransactions, toast]);
 
   return (
     <div className="container mx-auto sm:p-4 p-0">

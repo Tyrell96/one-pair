@@ -16,6 +16,22 @@ import { useRouter } from "next/navigation";
 import jwt from "jsonwebtoken";
 import { Label } from "@/components/ui/label";
 
+interface Transaction {
+  id: string;
+  type: string;
+  amount: number;
+  description: string;
+  date: string;
+  sender?: {
+    name: string;
+    username: string;
+  };
+  receiver?: {
+    name: string;
+    username: string;
+  };
+}
+
 interface Player {
   id: string;
   name: string;
@@ -78,7 +94,7 @@ export default function HomePage() {
   const [selectedProduct, setSelectedProduct] = useState<string | null>(null);
   const [selectedAmount, setSelectedAmount] = useState(0);
 
-  const processPointHistory = useCallback((transactions: any[]) => {
+  const processPointHistory = useCallback((transactions: Transaction[]) => {
     const dailyMap = new Map<string, number>();
     const hourlyMap = new Map<string, number>();
 

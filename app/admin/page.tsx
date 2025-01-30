@@ -76,33 +76,6 @@ export default function AdminPage() {
   const [pointAmount, setPointAmount] = useState("");
   const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
 
-  useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const token = localStorage.getItem("token");
-        if (!token) {
-          router.push("/sign-in");
-          return;
-        }
-
-        await Promise.all([
-          fetchUsers(),
-          fetchPointRequests(),
-          fetchTransactions()
-        ]);
-      } catch (error: unknown) {
-        console.error("인증 체크 에러:", error);
-        toast({
-          title: "오류",
-          description: "데이터를 불러오는데 실패했습니다.",
-          variant: "destructive",
-        });
-      }
-    };
-
-    checkAuth();
-  }, [fetchUsers, fetchPointRequests, fetchTransactions, router, toast]);
-
   // 사용자 목록 가져오기
   const fetchUsers = useCallback(async () => {
     try {
@@ -135,7 +108,16 @@ export default function AdminPage() {
       });
       if (!response.ok) throw new Error("포인트 요청을 불러올 수 없습니다.");
       const data = await response.json();
-      setPointRequests(data.requests);
+      
+      // 응답 데이터 구조 확인 및 처리
+      if (Array.isArray(data)) {
+        setPointRequests(data);
+      } else if (data.requests && Array.isArray(data.requests)) {
+        setPointRequests(data.requests);
+      } else {
+        console.error("예상치 못한 응답 데이터 구조:", data);
+        setPointRequests([]);
+      }
     } catch (error: unknown) {
       console.error("포인트 요청 로딩 에러:", error);
       toast({
@@ -143,8 +125,60 @@ export default function AdminPage() {
         description: "포인트 요청을 불러오는데 실패했습니다.",
         variant: "destructive",
       });
+      setPointRequests([]); // 에러 발생 시 빈 배열로 초기화
     }
   }, [toast]);
+
+  const fetchTransactions = useCallback(async () => {
+    try {
+      setIsLoadingTransactions(true);
+      const token = localStorage.getItem("token");
+      const response = await fetch(`/api/transactions?page=${currentPage}&pageSize=${pageSize}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      if (!response.ok) throw new Error("거래 내역을 불러올 수 없습니다.");
+      const data = await response.json();
+      setTransactions(data.transactions);
+      setTotalTransactions(data.total);
+    } catch (error: unknown) {
+      console.error("거래 내역 로딩 에러:", error);
+      toast({
+        title: "오류",
+        description: "거래 내역을 불러오는데 실패했습니다.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoadingTransactions(false);
+    }
+  }, [currentPage, pageSize, toast]);
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        if (!token) {
+          router.push("/sign-in");
+          return;
+        }
+
+        await Promise.all([
+          fetchUsers(),
+          fetchPointRequests(),
+          fetchTransactions()
+        ]);
+      } catch (error: unknown) {
+        console.error("인증 체크 에러:", error);
+        toast({
+          title: "오류",
+          description: "데이터를 불러오는데 실패했습니다.",
+          variant: "destructive",
+        });
+      }
+    };
+    checkAuth();
+  }, [router, toast, fetchUsers, fetchPointRequests, fetchTransactions]);
 
   // 관리자 권한 토글
   const toggleAdminRole = async (userId: string, currentRole: string) => {
@@ -333,32 +367,6 @@ export default function AdminPage() {
     }
   };
 
-  // 포인트 내역 조회
-  const fetchTransactions = useCallback(async () => {
-    try {
-      setIsLoadingTransactions(true);
-      const token = localStorage.getItem("token");
-      const response = await fetch(`/api/transactions?page=${currentPage}&pageSize=${pageSize}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      if (!response.ok) throw new Error("거래 내역을 불러올 수 없습니다.");
-      const data = await response.json();
-      setTransactions(data.transactions);
-      setTotalTransactions(data.total);
-    } catch (error: unknown) {
-      console.error("거래 내역 로딩 에러:", error);
-      toast({
-        title: "오류",
-        description: "거래 내역을 불러오는데 실패했습니다.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoadingTransactions(false);
-    }
-  }, [currentPage, pageSize, toast]);
-
   useEffect(() => {
     fetchTransactions();
   }, [fetchTransactions]);
@@ -492,52 +500,60 @@ export default function AdminPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {pointRequests.map((request) => (
-                    <TableRow key={request.id}>
-                      <TableCell>{new Date(request.createdAt).toLocaleDateString()}</TableCell>
-                      <TableCell>
-                        <div>{request.user.name}</div>
-                        <div className="text-sm text-muted-foreground">{request.user.username}</div>
-                      </TableCell>
-                      <TableCell>{request.type === "charge" ? "충전" : "출금"}</TableCell>
-                      <TableCell>{request.amount.toLocaleString()}P</TableCell>
-                      <TableCell>
-                        <span className={
-                          request.status === "approved" ? "text-green-600" :
-                          request.status === "rejected" ? "text-red-600" :
-                          "text-yellow-600"
-                        }>
-                          {request.status === "approved" ? "승인됨" :
-                           request.status === "rejected" ? "거절됨" :
-                           "대기중"}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        {request.status === "pending" && (
-                          <div className="flex space-x-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handlePointRequest(request.id, "approved")}
-                              disabled={isLoading}
-                            >
-                              <Check className="h-4 w-4 mr-2" />
-                              승인
-                            </Button>
-                            <Button
-                              variant="destructive"
-                              size="sm"
-                              onClick={() => handlePointRequest(request.id, "rejected")}
-                              disabled={isLoading}
-                            >
-                              <X className="h-4 w-4 mr-2" />
-                              거절
-                            </Button>
-                          </div>
-                        )}
+                  {pointRequests && pointRequests.length > 0 ? (
+                    pointRequests.map((request) => (
+                      <TableRow key={request.id}>
+                        <TableCell>{new Date(request.createdAt).toLocaleDateString()}</TableCell>
+                        <TableCell>
+                          <div>{request.user.name}</div>
+                          <div className="text-sm text-muted-foreground">{request.user.username}</div>
+                        </TableCell>
+                        <TableCell>{request.type === "charge" ? "충전" : "출금"}</TableCell>
+                        <TableCell>{request.amount.toLocaleString()}P</TableCell>
+                        <TableCell>
+                          <span className={
+                            request.status === "approved" ? "text-green-600" :
+                            request.status === "rejected" ? "text-red-600" :
+                            "text-yellow-600"
+                          }>
+                            {request.status === "approved" ? "승인됨" :
+                             request.status === "rejected" ? "거절됨" :
+                             "대기중"}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          {request.status === "pending" && (
+                            <div className="flex space-x-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handlePointRequest(request.id, "approved")}
+                                disabled={isLoading}
+                              >
+                                <Check className="h-4 w-4 mr-2" />
+                                승인
+                              </Button>
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                onClick={() => handlePointRequest(request.id, "rejected")}
+                                disabled={isLoading}
+                              >
+                                <X className="h-4 w-4 mr-2" />
+                                거절
+                              </Button>
+                            </div>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center py-4">
+                        포인트 요청이 없습니다.
                       </TableCell>
                     </TableRow>
-                  ))}
+                  )}
                 </TableBody>
               </Table>
             </CardContent>

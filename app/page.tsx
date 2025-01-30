@@ -78,61 +78,6 @@ export default function HomePage() {
   const [selectedProduct, setSelectedProduct] = useState<string | null>(null);
   const [selectedAmount, setSelectedAmount] = useState(0);
 
-  const checkAuth = useCallback(async () => {
-    try {
-      const token = localStorage.getItem("token");
-      const storedUser = localStorage.getItem("user");
-
-      if (!token || !storedUser) {
-        router.push("/sign-in");
-        return;
-      }
-
-      // 먼저 저장된 사용자 정보 표시
-      const cachedUser = JSON.parse(storedUser);
-      setUser(cachedUser);
-
-      // 백그라운드에서 최신 데이터 가져오기
-      const [userResponse, historyResponse] = await Promise.all([
-        fetch("/api/users/me", {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }),
-        fetch("/api/transactions", {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }),
-      ]);
-
-      if (!userResponse.ok || !historyResponse.ok) {
-        throw new Error("데이터를 불러올 수 없습니다.");
-      }
-
-      const [userData, historyData] = await Promise.all([
-        userResponse.json(),
-        historyResponse.json(),
-      ]);
-
-      setUser(userData);
-      setPointHistory(historyData.transactions);
-      processPointHistory(historyData.transactions);
-    } catch (error: unknown) {
-      console.error("인증 체크 에러:", error);
-      toast({
-        title: "오류",
-        description: "사용자 정보를 불러오는데 실패했습니다.",
-        variant: "destructive",
-      });
-    }
-  }, [router, toast, processPointHistory]);
-
-  // 사용자 인증 체크 및 정보 로드
-  useEffect(() => {
-    checkAuth();
-  }, [checkAuth]);
-
   const processPointHistory = useCallback((transactions: any[]) => {
     const dailyMap = new Map<string, number>();
     const hourlyMap = new Map<string, number>();
@@ -214,6 +159,61 @@ export default function HomePage() {
       }))
     );
   }, []);
+
+  const checkAuth = useCallback(async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const storedUser = localStorage.getItem("user");
+
+      if (!token || !storedUser) {
+        router.push("/sign-in");
+        return;
+      }
+
+      // 먼저 저장된 사용자 정보 표시
+      const cachedUser = JSON.parse(storedUser);
+      setUser(cachedUser);
+
+      // 백그라운드에서 최신 데이터 가져오기
+      const [userResponse, historyResponse] = await Promise.all([
+        fetch("/api/users/me", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }),
+        fetch("/api/transactions", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }),
+      ]);
+
+      if (!userResponse.ok || !historyResponse.ok) {
+        throw new Error("데이터를 불러올 수 없습니다.");
+      }
+
+      const [userData, historyData] = await Promise.all([
+        userResponse.json(),
+        historyResponse.json(),
+      ]);
+
+      setUser(userData);
+      setPointHistory(historyData.transactions);
+      processPointHistory(historyData.transactions);
+    } catch (error: unknown) {
+      console.error("인증 체크 에러:", error);
+      toast({
+        title: "오류",
+        description: "사용자 정보를 불러오는데 실패했습니다.",
+        variant: "destructive",
+      });
+    }
+  }, [router, toast]);
+
+  // 사용자 인증 체크 및 정보 로드
+  useEffect(() => {
+    checkAuth();
+  }, [checkAuth]);
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);

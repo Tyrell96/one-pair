@@ -295,7 +295,6 @@ export default function HomePage() {
       return;
     }
 
-    setIsLoading(true);
     try {
       const response = await fetch('/api/players', {
         method: 'POST',
@@ -325,10 +324,8 @@ export default function HomePage() {
         description: error instanceof Error ? error.message : "플레이어 추가에 실패했습니다.",
         variant: "destructive",
       });
-    } finally {
-      setIsLoading(false);
     }
-  }, [newPlayerName, toast, isLoading]);
+  }, [newPlayerName, toast]);
 
   const handleRemovePlayer = useCallback(async (playerId: string) => {
     try {

@@ -1,12 +1,18 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
+type RequestContext = {
+  params: {
+    userId: string;
+  };
+  searchParams: { [key: string]: string | string[] | undefined };
+};
+
 export async function PATCH(
   request: Request,
-  context: { params: { userId: string } }
+  { params }: Pick<RequestContext, 'params'>
 ) {
   try {
-    const params = await context.params;
     const { userId } = params;
     const { isDealer } = await request.json();
 

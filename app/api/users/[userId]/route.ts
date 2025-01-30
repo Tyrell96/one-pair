@@ -2,6 +2,13 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 
+type RequestContext = {
+  params: {
+    userId: string;
+  };
+  searchParams: { [key: string]: string | string[] | undefined };
+};
+
 // 사용자 삭제
 export async function DELETE(
   request: Request,
@@ -30,10 +37,9 @@ export async function DELETE(
 // 비밀번호 초기화
 export async function PATCH(
   request: Request,
-  context: { params: { userId: string } }
+  { params }: Pick<RequestContext, 'params'>
 ) {
   try {
-    const params = await context.params;
     const { userId } = params;
     const { action } = await request.json();
 

@@ -1,12 +1,18 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
+type RequestContext = {
+  params: {
+    userId: string;
+  };
+  searchParams: { [key: string]: string | string[] | undefined };
+};
+
 export async function POST(
   request: Request,
-  context: { params: { userId: string } }
+  { params }: Pick<RequestContext, 'params'>
 ) {
   try {
-    const params = await Promise.resolve(context.params);
     const { userId } = params;
     const { action, amount } = await request.json();
 

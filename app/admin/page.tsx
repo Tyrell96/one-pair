@@ -71,6 +71,9 @@ export default function AdminPage() {
   const [userSearchQuery, setUserSearchQuery] = useState("");
   const [pointAmount, setPointAmount] = useState("");
   const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
+  const [searchType, setSearchType] = useState("all");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedTransactionType, setSelectedTransactionType] = useState("all");
 
   // 사용자 목록 가져오기
   const fetchUsers = useCallback(async () => {
@@ -315,10 +318,11 @@ export default function AdminPage() {
       });
 
       fetchUsers();
-    } catch (error) {
+    } catch (error: unknown) {
+      console.error("사용자 삭제 에러:", error);
       toast({
         title: "오류",
-        description: "사용자 삭제에 실패했습니다.",
+        description: error instanceof Error ? error.message : "사용자 삭제에 실패했습니다.",
         variant: "destructive",
       });
     } finally {
@@ -342,8 +346,6 @@ export default function AdminPage() {
       });
 
       if (!response.ok) throw new Error("딜러 상태 변경에 실패했습니다.");
-
-      const data = await response.json();
       
       toast({
         title: "딜러 상태 변경 완료",
@@ -352,10 +354,11 @@ export default function AdminPage() {
 
       // 사용자 목록 새로고침
       await fetchUsers();
-    } catch (error) {
+    } catch (error: unknown) {
+      console.error("딜러 상태 변경 에러:", error);
       toast({
         title: "오류",
-        description: "딜러 상태 변경에 실패했습니다.",
+        description: error instanceof Error ? error.message : "딜러 상태 변경에 실패했습니다.",
         variant: "destructive",
       });
     } finally {
@@ -393,15 +396,16 @@ export default function AdminPage() {
         throw new Error(error.error || "포인트 관리 중 오류가 발생했습니다.");
       }
 
-      const data = await response.json();
+      const result = await response.json();
       
       toast({
         title: "성공",
-        description: data.message,
+        description: result.message,
       });
 
       fetchUsers();
-    } catch (error) {
+    } catch (error: unknown) {
+      console.error("포인트 관리 에러:", error);
       toast({
         title: "오류",
         description: error instanceof Error ? error.message : "포인트 관리 중 오류가 발생했습니다.",
@@ -580,7 +584,7 @@ export default function AdminPage() {
                     onChange={(e) => setSearchQuery(e.target.value)}
                   />
                 </div>
-                <Select value={transactionType} onValueChange={setTransactionType}>
+                <Select value={selectedTransactionType} onValueChange={setSelectedTransactionType}>
                   <SelectTrigger className="w-[180px]">
                     <SelectValue placeholder="거래 유형 선택" />
                   </SelectTrigger>

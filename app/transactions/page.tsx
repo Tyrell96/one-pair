@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -64,55 +64,65 @@ export default function TransactionsPage() {
     }
   }, []);
 
-  const fetchTransactions = async () => {
+  const fetchTransactions = useCallback(async () => {
     if (!user?.id) return;
-    
-    setIsLoading(true);
+
     try {
+      setIsLoading(true);
       const token = localStorage.getItem("token");
-      const response = await fetch(
-        `/api/transactions?page=${currentPage}&pageSize=${pageSize}`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
+      const response = await fetch(`/api/transactions?userId=${user.id}&page=${currentPage}&pageSize=${pageSize}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "포인트 내역을 불러올 수 없습니다.");
+        throw new Error("거래 내역을 불러올 수 없습니다.");
       }
 
       const data = await response.json();
       setTransactions(data.transactions);
       setTotalTransactions(data.total);
 
-      // 일별, 월별 통계 계산
-      const dailyMap = new Map<string, number>();
-      const monthlyMap = new Map<string, number>();
+      // 일별 통계 계산
+      const dailyData = data.transactions.reduce((acc: { [key: string]: number }, tx: Transaction) => {
+        const date = new Date(tx.date).toLocaleDateString();
+        acc[date] = (acc[date] || 0) + tx.amount;
+        return acc;
+      }, {});
 
-      data.transactions.forEach((tx: Transaction) => {
+      setDailyStats(
+        Object.entries(dailyData).map(([date, total]) => ({
+          date,
+          total,
+        }))
+      );
+
+      // 월별 통계 계산
+      const monthlyData = data.transactions.reduce((acc: { [key: string]: number }, tx: Transaction) => {
         const date = new Date(tx.date);
-        const dateKey = date.toISOString().split('T')[0];
         const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+        acc[monthKey] = (acc[monthKey] || 0) + tx.amount;
+        return acc;
+      }, {});
 
-        dailyMap.set(dateKey, (dailyMap.get(dateKey) || 0) + tx.amount);
-        monthlyMap.set(monthKey, (monthlyMap.get(monthKey) || 0) + tx.amount);
-      });
-
-      setDailyStats(Array.from(dailyMap.entries()).map(([date, total]) => ({ date, total })));
-      setMonthlyStats(Array.from(monthlyMap.entries()).map(([month, total]) => ({ month, total })));
-    } catch (error) {
+      setMonthlyStats(
+        Object.entries(monthlyData).map(([month, total]) => ({
+          month,
+          total,
+        }))
+      );
+    } catch (error: unknown) {
+      console.error("거래 내역 로딩 에러:", error);
       toast({
         title: "오류",
-        description: error instanceof Error ? error.message : "포인트 내역을 불러오는데 실패했습니다.",
+        description: error instanceof Error ? error.message : "거래 내역을 불러오는데 실패했습니다.",
         variant: "destructive",
       });
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [user?.id, currentPage, pageSize, toast]);
 
   useEffect(() => {
     if (user?.id) {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -78,110 +78,63 @@ export default function HomePage() {
   const [selectedProduct, setSelectedProduct] = useState<string | null>(null);
   const [selectedAmount, setSelectedAmount] = useState(0);
 
+  const checkAuth = useCallback(async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const storedUser = localStorage.getItem("user");
+
+      if (!token || !storedUser) {
+        router.push("/sign-in");
+        return;
+      }
+
+      // 먼저 저장된 사용자 정보 표시
+      const cachedUser = JSON.parse(storedUser);
+      setUser(cachedUser);
+      setLastRefreshTime(new Date()); // 캐시된 시간 표시
+
+      // 백그라운드에서 최신 데이터 가져오기
+      const [userResponse, historyResponse] = await Promise.all([
+        fetch("/api/users/me", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }),
+        fetch("/api/transactions", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }),
+      ]);
+
+      if (!userResponse.ok || !historyResponse.ok) {
+        throw new Error("데이터를 불러올 수 없습니다.");
+      }
+
+      const [userData, historyData] = await Promise.all([
+        userResponse.json(),
+        historyResponse.json(),
+      ]);
+
+      setUser(userData);
+      setPointHistory(historyData.transactions);
+      processPointHistory(historyData.transactions);
+    } catch (error) {
+      console.error("인증 체크 에러:", error);
+      toast({
+        title: "오류",
+        description: "사용자 정보를 불러오는데 실패했습니다.",
+        variant: "destructive",
+      });
+    }
+  }, [router, toast]);
+
   // 사용자 인증 체크 및 정보 로드
   useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const token = localStorage.getItem("token");
-        const storedUser = localStorage.getItem("user");
-
-        if (!token || !storedUser) {
-          router.push("/sign-in");
-          return;
-        }
-
-        // 먼저 저장된 사용자 정보 표시
-        const cachedUser = JSON.parse(storedUser);
-        setUser(cachedUser);
-        setLastRefreshTime(new Date()); // 캐시된 시간 표시
-
-        // 백그라운드에서 최신 데이터 가져오기
-        const [userResponse, historyResponse] = await Promise.all([
-          fetch("/api/users/me", {
-            headers: { Authorization: `Bearer ${token}` },
-          }),
-          fetch(`/api/transactions?userId=${cachedUser.id}&page=1&pageSize=10`, {
-            headers: { Authorization: `Bearer ${token}` },
-          })
-        ]);
-
-        if (userResponse.ok && historyResponse.ok) {
-          const [userData, historyData] = await Promise.all([
-            userResponse.json(),
-            historyResponse.json()
-          ]);
-
-          // userData가 올바른 형식인지 확인
-          if (userData && userData.user && typeof userData.user.points === 'number') {
-            // 포인트가 변경된 경우에만 UI 업데이트
-            if (userData.user.points !== cachedUser.points) {
-              setUser(userData.user);
-              localStorage.setItem("user", JSON.stringify(userData.user));
-            }
-          }
-
-          // historyData가 올바른 형식인지 확인
-          if (historyData && Array.isArray(historyData.transactions)) {
-            processPointHistory(historyData.transactions);
-          }
-          
-          setLastRefreshTime(new Date());
-        }
-      } catch (error) {
-        console.error("데이터 로딩 에러:", error);
-        // 에러가 발생해도 캐시된 데이터는 유지
-      }
-    };
-
     checkAuth();
+  }, [checkAuth]);
 
-    // 5분마다 자동 새로고침 (백그라운드)
-    const autoRefreshInterval = setInterval(async () => {
-      if (user?.id) {
-        try {
-          const token = localStorage.getItem("token");
-          const response = await fetch("/api/users/me", {
-            headers: { Authorization: `Bearer ${token}` },
-          });
-
-          if (response.ok) {
-            const data = await response.json();
-            // 데이터가 올바른 형식인지 확인
-            if (data && data.user && typeof data.user.points === 'number' && user) {
-              // 포인트가 변경된 경우에만 UI 업데이트
-              if (data.user.points !== user.points) {
-                setUser(data.user);
-                localStorage.setItem("user", JSON.stringify(data.user));
-                setLastRefreshTime(new Date());
-                toast({
-                  title: "포인트 업데이트",
-                  description: "포인트 정보가 변경되었습니다.",
-                });
-              }
-            }
-          }
-        } catch (error) {
-          console.error("자동 새로고침 에러:", error);
-        }
-      }
-    }, 5 * 60 * 1000);
-
-    return () => clearInterval(autoRefreshInterval);
-  }, []);
-
-  // 날짜 포맷팅 함수 추가
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    const hours = String(date.getHours()).padStart(2, '0');
-    const minutes = String(date.getMinutes()).padStart(2, '0');
-    return `${year}-${month}-${day} ${hours}:${minutes}`;
-  };
-
-  // 포인트 내역 데이터 가공
-  const processPointHistory = (transactions: any[]) => {
+  const processPointHistory = useCallback((transactions: any[]) => {
     const dailyMap = new Map<string, number>();
     const hourlyMap = new Map<string, number>();
 
@@ -261,6 +214,16 @@ export default function HomePage() {
         date: formatDate(tx.date)
       }))
     );
+  }, []);
+
+  const formatDate = (dateStr: string) => {
+    const date = new Date(dateStr);
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    return `${year}-${month}-${day} ${hours}:${minutes}`;
   };
 
   const formatDateLabel = (dateStr: string) => {
@@ -269,7 +232,7 @@ export default function HomePage() {
   };
 
   // 포인트 내역 가져오기
-  const fetchPointHistory = async (userId: string) => {
+  const fetchPointHistory = useCallback(async (userId: string) => {
     try {
       const token = localStorage.getItem('token');
       const response = await fetch(`/api/transactions?userId=${userId}`, {
@@ -284,10 +247,10 @@ export default function HomePage() {
     } catch (error) {
       console.error("포인트 내역 로딩 에러:", error);
     }
-  };
+  }, [processPointHistory]);
 
   // 플레이어 목록 불러오기
-  const fetchPlayers = async () => {
+  const fetchPlayers = useCallback(async () => {
     try {
       const response = await fetch('/api/players');
       if (!response.ok) throw new Error('플레이어 목록을 불러오는데 실패했습니다.');
@@ -300,13 +263,13 @@ export default function HomePage() {
         variant: "destructive",
       });
     }
-  };
+  }, [toast]);
 
   useEffect(() => {
     fetchPlayers();
-  }, []);
+  }, [fetchPlayers]);
 
-  const handleAddPlayer = async () => {
+  const handleAddPlayer = useCallback(async () => {
     if (!newPlayerName.trim()) {
       toast({
         title: "오류",
@@ -348,9 +311,9 @@ export default function HomePage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [newPlayerName, toast]);
 
-  const handleRemovePlayer = async (playerId: string) => {
+  const handleRemovePlayer = useCallback(async (playerId: string) => {
     try {
       const response = await fetch(`/api/players?id=${playerId}`, {
         method: 'DELETE',
@@ -371,9 +334,9 @@ export default function HomePage() {
         variant: "destructive",
       });
     }
-  };
+  }, [toast]);
 
-  const handleAddSavedPlayer = (player: Player) => {
+  const handleAddSavedPlayer = useCallback((player: Player) => {
     if (players.some(p => p.id === player.id)) {
       toast({
         title: "오류",
@@ -390,9 +353,9 @@ export default function HomePage() {
       title: "플레이어 추가",
       description: `${player.name}님이 게임에 참여했습니다.`,
     });
-  };
+  }, [players, toast]);
 
-  const handleRemoveSavedPlayer = (playerId: string) => {
+  const handleRemoveSavedPlayer = useCallback((playerId: string) => {
     const updatedSavedPlayers = savedPlayers.filter(p => p.id !== playerId);
     localStorage.setItem("savedPlayers", JSON.stringify(updatedSavedPlayers));
     setSavedPlayers(updatedSavedPlayers);
@@ -401,16 +364,16 @@ export default function HomePage() {
       title: "플레이어 삭제",
       description: "저장된 플레이어가 삭제되었습니다.",
     });
-  };
+  }, [savedPlayers, toast]);
 
-  const handleLogout = () => {
+  const handleLogout = useCallback(() => {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
     router.push('/sign-in');
-  };
+  }, [router]);
 
   // 사용자 정보 새로고침
-  const refreshUserInfo = async () => {
+  const refreshUserInfo = useCallback(async () => {
     try {
       const token = localStorage.getItem('token');
       const response = await fetch('/api/users/me', {
@@ -430,22 +393,22 @@ export default function HomePage() {
     } catch (error) {
       console.error('사용자 정보 새로고침 에러:', error);
     }
-  };
+  }, [fetchPointHistory]);
 
   // 주기적으로 사용자 정보 새로고침 (10초마다)
   useEffect(() => {
     const interval = setInterval(refreshUserInfo, 10000);
     return () => clearInterval(interval);
-  }, []);
+  }, [refreshUserInfo]);
 
   // user 상태가 변경될 때마다 포인트 내역 새로고침
   useEffect(() => {
     if (user) {
       fetchPointHistory(user.id);
     }
-  }, [user?.points]);
+  }, [user?.points, fetchPointHistory]);
 
-  const handlePointRequest = async () => {
+  const handlePointRequest = useCallback(async () => {
     if (!user) return;
     
     const amount = parseInt(pointRequestAmount);
@@ -503,9 +466,9 @@ export default function HomePage() {
         variant: "destructive",
       });
     }
-  };
+  }, [pointRequestAmount, pointRequestType, toast, user?.id, fetchPointHistory, refreshUserInfo]);
 
-  const handleSeatAssignment = () => {
+  const handleSeatAssignment = useCallback(() => {
     if (players.length === 0) {
       toast({
         title: "오류",
@@ -520,15 +483,15 @@ export default function HomePage() {
     
     // 테이블 설정 페이지로 이동
     router.push('/table-setup');
-  };
+  }, [savedPlayers, router]);
 
-  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleKeyPress = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && !isLoading) {
       handleAddPlayer();
     }
-  };
+  }, [handleAddPlayer]);
 
-  const refreshPoints = async () => {
+  const refreshPoints = useCallback(async () => {
     if (isRefreshing || !user?.id) return;
     
     setIsRefreshing(true);
@@ -576,14 +539,14 @@ export default function HomePage() {
     } finally {
       setIsRefreshing(false);
     }
-  };
+  }, [toast, user?.id, processPointHistory]);
 
-  const handleSelectProduct = (product: string, price: number) => {
+  const handleSelectProduct = useCallback((product: string, price: number) => {
     setSelectedProduct(product);
     setSelectedAmount(price);
-  };
+  }, []);
 
-  const handleUsePoints = async () => {
+  const handleUsePoints = useCallback(async () => {
     if (!selectedProduct || selectedAmount > (user?.points || 0)) {
       toast({
         title: "오류",
@@ -639,10 +602,10 @@ export default function HomePage() {
         variant: "destructive",
       });
     }
-  };
+  }, [selectedProduct, selectedAmount, toast, user?.id, fetchPointHistory, refreshUserInfo]);
 
   // 토큰 만료 체크
-  const checkTokenExpiration = () => {
+  const checkTokenExpiration = useCallback(() => {
     const token = localStorage.getItem("token");
     if (!token) return;
 
@@ -665,18 +628,18 @@ export default function HomePage() {
     } catch (error) {
       console.error("토큰 검증 에러:", error);
     }
-  };
+  }, [handleLogout, toast]);
 
   // 1분마다 토큰 만료 체크
   useEffect(() => {
     const tokenCheckInterval = setInterval(checkTokenExpiration, 60000);
     return () => clearInterval(tokenCheckInterval);
-  }, []);
+  }, [checkTokenExpiration]);
 
   // 페이지 로드 시 즉시 한 번 체크
   useEffect(() => {
     checkTokenExpiration();
-  }, []);
+  }, [checkTokenExpiration]);
 
   // 로딩 상태 표시
   if (!user) {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -28,32 +28,31 @@ export default function PaymentPage() {
   const [selectedDealer, setSelectedDealer] = useState("");
   const [dealers, setDealers] = useState<User[]>([]);
 
+  const fetchDealers = useCallback(async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch("/api/users/dealers", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      if (!response.ok) throw new Error("딜러 목록을 불러올 수 없습니다.");
+      const data = await response.json();
+      setDealers(data.dealers);
+    } catch (error) {
+      toast({
+        title: "오류",
+        description: "딜러 목록을 불러오는데 실패했습니다.",
+        variant: "destructive",
+      });
+    }
+  }, [toast]);
+
   useEffect(() => {
-    // 딜러 목록 가져오기
-    const fetchDealers = async () => {
-      try {
-        const token = localStorage.getItem("token");
-        const response = await fetch("/api/users/dealers", {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-        if (!response.ok) throw new Error("딜러 목록을 불러올 수 없습니다.");
-        const data = await response.json();
-        setDealers(data.dealers);
-      } catch (error) {
-        toast({
-          title: "오류",
-          description: "딜러 목록을 불러오는데 실패했습니다.",
-          variant: "destructive",
-        });
-      }
-    };
-
     fetchDealers();
-  }, []);
+  }, [fetchDealers]);
 
-  const handlePayment = async () => {
+  const handlePayment = useCallback(async () => {
     if (!selectedDealer) {
       toast({
         title: "오류",
@@ -105,7 +104,7 @@ export default function PaymentPage() {
         variant: "destructive",
       });
     }
-  };
+  }, [selectedDealer, amount, dealers, toast, router]);
 
   return (
     <div className="container mx-auto sm:p-4 p-0">

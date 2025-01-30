@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,32 +28,7 @@ export default function ProfilePage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
-  useEffect(() => {
-    // 토큰에서 사용자 정보 가져오기
-    const token = localStorage.getItem("token");
-    if (!token) {
-      router.push("/sign-in");
-      return;
-    }
-
-    try {
-      const decoded = jwt.decode(token) as UserProfile;
-      if (decoded) {
-        setProfile({
-          id: decoded.id,
-          name: decoded.name,
-          email: decoded.email,
-          points: decoded.points,
-          avatar: decoded.avatar,
-        });
-      }
-    } catch (error) {
-      console.error("토큰 디코딩 에러:", error);
-      router.push("/sign-in");
-    }
-  }, []);
-
-  const handleProfileUpdate = async () => {
+  const handleProfileUpdate = useCallback(async () => {
     if (!profile) return;
 
     if (newPassword && newPassword !== confirmPassword) {
@@ -88,22 +63,6 @@ export default function ProfilePage() {
 
       const updatedUser = await response.json();
       
-      // 토큰 업데이트
-      const token = localStorage.getItem("token");
-      if (token) {
-        const decoded = jwt.decode(token) as any;
-        const newToken = jwt.sign(
-          {
-            ...decoded,
-            name: updatedUser.name,
-            email: updatedUser.email,
-          },
-          process.env.NEXT_PUBLIC_JWT_SECRET || "your-secret-key",
-          { expiresIn: "1d" }
-        );
-        localStorage.setItem("token", newToken);
-      }
-
       toast({
         title: "성공",
         description: "프로필이 업데이트되었습니다.",
@@ -119,7 +78,31 @@ export default function ProfilePage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [profile, newPassword, confirmPassword, currentPassword, toast, router]);
+
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      router.push("/sign-in");
+      return;
+    }
+
+    try {
+      const decoded = jwt.decode(token) as UserProfile;
+      if (decoded) {
+        setProfile({
+          id: decoded.id,
+          name: decoded.name,
+          email: decoded.email,
+          points: decoded.points,
+          avatar: decoded.avatar,
+        });
+      }
+    } catch (error) {
+      console.error("토큰 디코딩 에러:", error);
+      router.push("/sign-in");
+    }
+  }, [router]);
 
   if (!profile) {
     return (

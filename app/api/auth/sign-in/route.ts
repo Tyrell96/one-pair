@@ -48,7 +48,15 @@ export async function POST(request: Request) {
     }
 
     // 응답에서 비밀번호 제외
-    const { password: _, ...userWithoutPassword } = user;
+    const userWithoutPassword = {
+      id: user.id,
+      username: user.username,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      points: user.points,
+      isDealer: user.isDealer
+    };
 
     // JWT 토큰 생성
     const token = jwt.sign(

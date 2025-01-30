@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -34,12 +34,7 @@ export default function PointManagementPage() {
   const [pointRequests, setPointRequests] = useState<PointRequest[]>([]);
   const [transactions, setTransactions] = useState<PointTransaction[]>([]);
 
-  useEffect(() => {
-    fetchPointRequests();
-    fetchTransactions();
-  }, []);
-
-  const fetchPointRequests = async () => {
+  const fetchPointRequests = useCallback(async () => {
     try {
       const response = await fetch("/api/point-requests");
       if (!response.ok) throw new Error("포인트 요청을 불러올 수 없습니다.");
@@ -52,9 +47,9 @@ export default function PointManagementPage() {
         variant: "destructive",
       });
     }
-  };
+  }, [toast]);
 
-  const fetchTransactions = async () => {
+  const fetchTransactions = useCallback(async () => {
     try {
       const response = await fetch("/api/transactions");
       if (!response.ok) throw new Error("거래 내역을 불러올 수 없습니다.");
@@ -67,7 +62,12 @@ export default function PointManagementPage() {
         variant: "destructive",
       });
     }
-  };
+  }, [toast]);
+
+  useEffect(() => {
+    fetchPointRequests();
+    fetchTransactions();
+  }, [fetchPointRequests, fetchTransactions]);
 
   const handleRequestAction = async (requestId: string, action: "approve" | "reject") => {
     try {

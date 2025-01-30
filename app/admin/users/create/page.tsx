@@ -57,10 +57,10 @@ export default function CreateUserPage() {
       });
 
       router.push("/admin");
-    } catch (error) {
+    } catch (error: unknown) {
       toast({
         title: "오류",
-        description: "계정 생성 중 오류가 발생했습니다.",
+        description: error instanceof Error ? error.message : "계정 생성 중 오류가 발생했습니다.",
         variant: "destructive",
       });
     } finally {

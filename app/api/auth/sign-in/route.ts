@@ -50,7 +50,7 @@ export async function POST(request: Request) {
     }
 
     // 응답에서 비밀번호 제외
-    const { password: hashedPassword, ...userWithoutPassword } = user;
+    const { password: _, ...userWithoutPassword } = user;
 
     // JWT 토큰 생성
     const token = jwt.sign(

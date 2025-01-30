@@ -65,6 +65,11 @@ export async function POST(request: Request) {
     return NextResponse.json({
       tableName: selectedSeat.tableName,
       seatNumber: selectedSeat.seatNumber,
+      assignment: {
+        id: assignment.id,
+        playerName: assignment.playerName,
+        createdAt: assignment.createdAt
+      }
     });
   } catch (error) {
     console.error("자리 배정 에러:", error);

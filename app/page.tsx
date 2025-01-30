@@ -475,14 +475,15 @@ export default function HomePage() {
       fetchPointHistory(user.id);
       // 사용자 정보 새로고침
       refreshUserInfo();
-    } catch (error) {
+    } catch (error: unknown) {
+      console.error("포인트 요청 에러:", error);
       toast({
         title: "오류",
-        description: "요청 처리 중 오류가 발생했습니다.",
+        description: error instanceof Error ? error.message : "요청 처리 중 오류가 발생했습니다.",
         variant: "destructive",
       });
     }
-  }, [pointRequestAmount, pointRequestType, toast, user?.id, fetchPointHistory, refreshUserInfo]);
+  }, [pointRequestAmount, pointRequestType, toast, user, fetchPointHistory, refreshUserInfo]);
 
   const handleSeatAssignment = useCallback(() => {
     if (players.length === 0) {
@@ -502,7 +503,7 @@ export default function HomePage() {
   }, [players, router, toast]);
 
   const handleKeyPress = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' && !isLoading) {
+    if (e.key === 'Enter') {
       handleAddPlayer();
     }
   }, [handleAddPlayer]);

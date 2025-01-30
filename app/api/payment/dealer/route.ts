@@ -141,10 +141,10 @@ export async function POST(request: Request) {
     });
 
     return NextResponse.json(result);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("포인트 전달 에러:", error);
     return NextResponse.json(
-      { error: error.message || "포인트 전달에 실패했습니다." },
+      { error: error instanceof Error ? error.message : "포인트 전달에 실패했습니다." },
       { status: 500 }
     );
   }

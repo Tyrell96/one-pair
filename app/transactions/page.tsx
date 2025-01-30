@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ChevronLeft, ChevronRight, History, Home } from "lucide-react";
+import { ChevronLeft, ChevronRight, Home } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -19,6 +19,14 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs";
+
+interface User {
+  id: string;
+  name: string;
+  email: string;
+  points: number;
+  role: string;
+}
 
 interface Transaction {
   id: string;
@@ -46,7 +54,7 @@ export default function TransactionsPage() {
   const [totalTransactions, setTotalTransactions] = useState(0);
   const [dailyStats, setDailyStats] = useState<{ date: string; total: number }[]>([]);
   const [monthlyStats, setMonthlyStats] = useState<{ month: string; total: number }[]>([]);
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null);
 
   useEffect(() => {
     // 로컬 스토리지에서 사용자 정보 가져오기
@@ -110,7 +118,7 @@ export default function TransactionsPage() {
     if (user?.id) {
       fetchTransactions();
     }
-  }, [fetchTransactions]);
+  }, [user?.id, fetchTransactions]);
 
   const totalPages = Math.ceil(totalTransactions / Number(pageSize));
 

@@ -91,7 +91,6 @@ export default function HomePage() {
       // 먼저 저장된 사용자 정보 표시
       const cachedUser = JSON.parse(storedUser);
       setUser(cachedUser);
-      setLastRefreshTime(new Date()); // 캐시된 시간 표시
 
       // 백그라운드에서 최신 데이터 가져오기
       const [userResponse, historyResponse] = await Promise.all([
@@ -119,7 +118,7 @@ export default function HomePage() {
       setUser(userData);
       setPointHistory(historyData.transactions);
       processPointHistory(historyData.transactions);
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("인증 체크 에러:", error);
       toast({
         title: "오류",
@@ -127,7 +126,7 @@ export default function HomePage() {
         variant: "destructive",
       });
     }
-  }, [router, toast]);
+  }, [router, toast, processPointHistory]);
 
   // 사용자 인증 체크 및 정보 로드
   useEffect(() => {

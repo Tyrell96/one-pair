@@ -26,13 +26,11 @@ export function SignUpForm() {
     name: "",
     email: "",
   });
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [name, setName] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsLoading(true);
     
     if (formData.password !== formData.passwordConfirm) {
       toast({
@@ -40,6 +38,7 @@ export function SignUpForm() {
         description: "비밀번호가 일치하지 않습니다.",
         variant: "destructive",
       });
+      setIsLoading(false);
       return;
     }
 
@@ -73,6 +72,8 @@ export function SignUpForm() {
         description: error instanceof Error ? error.message : "알 수 없는 오류가 발생했습니다.",
         variant: "destructive",
       });
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -145,7 +146,7 @@ export function SignUpForm() {
           />
         </div>
 
-        <Button type="submit" className="w-full">
+        <Button type="submit" className="w-full" disabled={isLoading}>
           회원가입
         </Button>
       </form>

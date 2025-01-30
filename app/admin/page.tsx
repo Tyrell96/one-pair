@@ -104,7 +104,7 @@ export default function AdminPage() {
   }, [fetchUsers, fetchPointRequests, fetchTransactions, router, toast]);
 
   // 사용자 목록 가져오기
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     try {
       const token = localStorage.getItem("token");
       const response = await fetch("/api/users", {
@@ -115,16 +115,17 @@ export default function AdminPage() {
       if (!response.ok) throw new Error("사용자 목록을 불러올 수 없습니다.");
       const data = await response.json();
       setUsers(data);
-    } catch (error) {
+    } catch (error: unknown) {
+      console.error("사용자 목록 로딩 에러:", error);
       toast({
         title: "오류",
         description: "사용자 목록을 불러오는데 실패했습니다.",
         variant: "destructive",
       });
     }
-  };
+  }, [toast]);
 
-  const fetchPointRequests = async () => {
+  const fetchPointRequests = useCallback(async () => {
     try {
       const token = localStorage.getItem("token");
       const response = await fetch("/api/point-requests", {
@@ -132,17 +133,18 @@ export default function AdminPage() {
           Authorization: `Bearer ${token}`,
         },
       });
-      if (!response.ok) throw new Error("포인트 요청 목록을 불러올 수 없습니다.");
+      if (!response.ok) throw new Error("포인트 요청을 불러올 수 없습니다.");
       const data = await response.json();
-      setPointRequests(data);
-    } catch (error) {
+      setPointRequests(data.requests);
+    } catch (error: unknown) {
+      console.error("포인트 요청 로딩 에러:", error);
       toast({
         title: "오류",
-        description: "포인트 요청 목록을 불러오는데 실패했습니다.",
+        description: "포인트 요청을 불러오는데 실패했습니다.",
         variant: "destructive",
       });
     }
-  };
+  }, [toast]);
 
   // 관리자 권한 토글
   const toggleAdminRole = async (userId: string, currentRole: string) => {
@@ -332,57 +334,34 @@ export default function AdminPage() {
   };
 
   // 포인트 내역 조회
-  const fetchTransactions = async () => {
-    setIsLoadingTransactions(true);
+  const fetchTransactions = useCallback(async () => {
     try {
-      const queryParams = new URLSearchParams({
-        page: currentPage.toString(),
-        pageSize: pageSize.toString(),
+      setIsLoadingTransactions(true);
+      const token = localStorage.getItem("token");
+      const response = await fetch(`/api/transactions?page=${currentPage}&pageSize=${pageSize}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
       });
-
-      if (searchQuery) {
-        queryParams.append('search', searchQuery);
-        queryParams.append('searchType', searchType);
-      }
-      if (transactionType !== "all") queryParams.append('type', transactionType);
-
-      const response = await fetch(`/api/admin/transactions?${queryParams}`);
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "포인트 내역을 불러올 수 없습니다.");
-      }
-
+      if (!response.ok) throw new Error("거래 내역을 불러올 수 없습니다.");
       const data = await response.json();
       setTransactions(data.transactions);
       setTotalTransactions(data.total);
-    } catch (error) {
+    } catch (error: unknown) {
+      console.error("거래 내역 로딩 에러:", error);
       toast({
         title: "오류",
-        description: error instanceof Error ? error.message : "포인트 내역을 불러오는데 실패했습니다.",
+        description: "거래 내역을 불러오는데 실패했습니다.",
         variant: "destructive",
       });
     } finally {
       setIsLoadingTransactions(false);
     }
-  };
-
-  useEffect(() => {
-    if (searchQuery || transactionType !== "all") {
-      const debounceTimer = setTimeout(() => {
-        setCurrentPage(1);
-        fetchTransactions();
-      }, 300);
-
-      return () => clearTimeout(debounceTimer);
-    } else {
-      fetchTransactions();
-    }
-  }, [searchQuery, transactionType]);
+  }, [currentPage, pageSize, toast]);
 
   useEffect(() => {
     fetchTransactions();
-  }, [currentPage, pageSize]);
+  }, [fetchTransactions]);
 
   const totalPages = Math.ceil(totalTransactions / pageSize);
 

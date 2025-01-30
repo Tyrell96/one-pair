@@ -44,7 +44,7 @@ export async function POST(
     try {
       const result = await prisma.$transaction(async (tx) => {
         // 1. 요청 상태 업데이트
-        const updatedRequest = await tx.pointRequest.update({
+        await tx.pointRequest.update({
           where: { id: requestId },
           data: { status },
         });
@@ -83,7 +83,7 @@ export async function POST(
           });
 
           // 3. 포인트 트랜잭션 기록 생성
-          const transaction = await tx.pointTransaction.create({
+          await tx.pointTransaction.create({
             data: {
               type: pointRequest.type === 'charge' ? '충전' : '출금',
               amount: pointRequest.amount,

@@ -1,16 +1,9 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
-type RequestContext = {
-  params: {
-    userId: string;
-  };
-  searchParams: { [key: string]: string | string[] | undefined };
-};
-
 export async function POST(
   request: Request,
-  { params }: Pick<RequestContext, 'params'>
+  { params }: { params: { userId: string } }
 ) {
   try {
     const { userId } = params;

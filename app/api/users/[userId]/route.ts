@@ -12,10 +12,9 @@ type RequestContext = {
 // 사용자 삭제
 export async function DELETE(
   request: Request,
-  context: { params: { userId: string } }
+  { params }: { params: { userId: string } }
 ) {
   try {
-    const params = await context.params;
     const { userId } = params;
 
     await prisma.user.delete({
@@ -37,7 +36,7 @@ export async function DELETE(
 // 비밀번호 초기화
 export async function PATCH(
   request: Request,
-  { params }: Pick<RequestContext, 'params'>
+  { params }: { params: { userId: string } }
 ) {
   try {
     const { userId } = params;

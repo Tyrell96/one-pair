@@ -1,0 +1,92 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id            String         @id @default(cuid())
+  username      String        @unique
+  email         String        @unique
+  password      String
+  name          String
+  role          String        @default("USER")
+  points        Int           @default(1000)
+  avatar        String?
+  isDealer      Boolean       @default(false)
+  pointRequests PointRequest[]
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  sentTransactions     PointTransaction[] @relation("Sender")
+  receivedTransactions PointTransaction[] @relation("Receiver")
+}
+
+model PointTransaction {
+  id          String   @id @default(cuid())
+  type        String   // 'charge' | 'withdraw' | 'transfer' | 'receive'
+  amount      Int
+  description String?
+  createdAt   DateTime @default(now())
+  
+  // 송신자 관계
+  sender      User     @relation("Sender", fields: [senderId], references: [id])
+  senderId    String
+
+  // 수신자 관계
+  receiver    User     @relation("Receiver", fields: [receiverId], references: [id])
+  receiverId  String
+
+  @@index([senderId])
+  @@index([receiverId])
+  @@index([createdAt])
+}
+
+model PokerTable {
+  id             String           @id @default(cuid())
+  name           String
+  color          String
+  number         Int
+  seats          Int
+  seatAssignments SeatAssignment[]
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+}
+
+model SeatAssignment {
+  id          String      @id @default(cuid())
+  table       PokerTable  @relation(fields: [tableId], references: [id])
+  tableId     String
+  playerName  String
+  seatNumber  Int
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+}
+
+model PointRequest {
+  id        String   @id @default(cuid())
+  type      String   // 'charge' or 'withdraw'
+  amount    Int
+  status    String   // 'pending', 'approved', 'rejected'
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Player {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  points    Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

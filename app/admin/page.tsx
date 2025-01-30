@@ -268,10 +268,11 @@ export default function AdminPage() {
         title: "비밀번호 초기화 완료",
         description: `임시 비밀번호: ${data.tempPassword}`,
       });
-    } catch (error) {
+    } catch (error: unknown) {
+      console.error("비밀번호 초기화 에러:", error);
       toast({
         title: "오류",
-        description: "비밀번호 초기화에 실패했습니다.",
+        description: error instanceof Error ? error.message : "비밀번호 초기화에 실패했습니다.",
         variant: "destructive",
       });
     } finally {

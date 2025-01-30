@@ -220,11 +220,11 @@ export default function HomePage() {
       console.error("인증 체크 에러:", error);
       toast({
         title: "오류",
-        description: "사용자 정보를 불러오는데 실패했습니다.",
+        description: error instanceof Error ? error.message : "사용자 정보를 불러오는데 실패했습니다.",
         variant: "destructive",
       });
     }
-  }, [router, toast]);
+  }, [router, toast, processPointHistory]);
 
   // 사용자 인증 체크 및 정보 로드
   useEffect(() => {
@@ -317,16 +317,17 @@ export default function HomePage() {
         title: "플레이어 추가",
         description: `${newPlayer.name}님이 등록되었습니다.`,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
+      console.error("플레이어 추가 에러:", error);
       toast({
         title: "오류",
-        description: error.message,
+        description: error instanceof Error ? error.message : "플레이어 추가에 실패했습니다.",
         variant: "destructive",
       });
     } finally {
       setIsLoading(false);
     }
-  }, [newPlayerName, toast]);
+  }, [newPlayerName, toast, isLoading]);
 
   const handleRemovePlayer = useCallback(async (playerId: string) => {
     try {
@@ -498,7 +499,7 @@ export default function HomePage() {
     
     // 테이블 설정 페이지로 이동
     router.push('/table-setup');
-  }, [savedPlayers, router]);
+  }, [players, router, toast]);
 
   const handleKeyPress = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && !isLoading) {
@@ -545,16 +546,17 @@ export default function HomePage() {
           description: "포인트 정보가 업데이트되었습니다.",
         });
       }
-    } catch (error) {
+    } catch (error: unknown) {
+      console.error("포인트 새로고침 에러:", error);
       toast({
         title: "오류",
-        description: "포인트 정보를 불러오는데 실패했습니다.",
+        description: error instanceof Error ? error.message : "포인트 정보를 불러오는데 실패했습니다.",
         variant: "destructive",
       });
     } finally {
       setIsRefreshing(false);
     }
-  }, [toast, user?.id, processPointHistory]);
+  }, [toast, user?.id, processPointHistory, isRefreshing]);
 
   const handleSelectProduct = useCallback((product: string, price: number) => {
     setSelectedProduct(product);

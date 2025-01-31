@@ -21,7 +21,7 @@ model User {
   password      String
   name          String
   role          String        @default("USER")
-  points        Int           @default(1000)
+  points        Int           @default(0)
   avatar        String?
   isDealer      Boolean       @default(false)
   pointRequests PointRequest[]

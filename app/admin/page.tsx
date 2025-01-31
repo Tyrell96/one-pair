@@ -444,7 +444,7 @@ export default function AdminPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>요청일</TableHead>
-                    <TableHead>사용자</TableHead>
+                    <TableHead>사용자(ID)</TableHead>
                     <TableHead>유형</TableHead>
                     <TableHead>금액</TableHead>
                     <TableHead>상태</TableHead>
@@ -457,8 +457,7 @@ export default function AdminPage() {
                       <TableRow key={request.id}>
                         <TableCell>{new Date(request.createdAt).toLocaleDateString()}</TableCell>
                         <TableCell>
-                          <div>{request.user.name}</div>
-                          <div className="text-sm text-muted-foreground">{request.user.username}</div>
+                          <div>{request.user.name}({request.user.username})</div>
                         </TableCell>
                         <TableCell>{request.type === "charge" ? "충전" : "출금"}</TableCell>
                         <TableCell>{request.amount.toLocaleString()}P</TableCell>

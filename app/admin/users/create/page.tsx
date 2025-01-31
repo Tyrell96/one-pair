@@ -1,152 +1,183 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import * as z from "zod";
 import { Button } from "@/components/ui/button";
-import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft } from "lucide-react";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { toast } from "sonner";
+import { useRouter } from "next/navigation";
+
+const formSchema = z.object({
+  name: z.string().min(2, "이름은 2글자 이상이어야 합니다."),
+  username: z.string().min(4, "아이디는 4글자 이상이어야 합니다."),
+  password: z.string(),
+  confirmPassword: z.string(),
+  email: z.string().email("올바른 이메일 형식이 아닙니다."),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "비밀번호가 일치하지 않습니다.",
+  path: ["confirmPassword"],
+});
 
 export default function CreateUserPage() {
   const router = useRouter();
-  const { toast } = useToast();
-  const [formData, setFormData] = useState({
-    name: "",
-    email: "",
-    password: "",
-    confirmPassword: "",
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      name: "",
+      username: "",
+      password: "",
+      confirmPassword: "",
+      email: "",
+    },
   });
-  const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (formData.password !== formData.confirmPassword) {
-      toast({
-        title: "오류",
-        description: "비밀번호가 일치하지 않습니다.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setIsLoading(true);
+  async function onSubmit(values: z.infer<typeof formSchema>) {
     try {
-      const token = localStorage.getItem("token");
-      const response = await fetch("/api/users", {
+      const response = await fetch("/api/admin/users", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          name: formData.name,
-          email: formData.email,
-          password: formData.password,
+          name: values.name,
+          username: values.username,
+          password: values.password,
+          email: values.email,
         }),
       });
 
+      const data = await response.json();
+
       if (!response.ok) {
-        throw new Error("계정 생성에 실패했습니다.");
+        // 중복 에러 처리
+        if (data.error.includes("아이디")) {
+          form.setError("username", { 
+            type: "manual",
+            message: data.error
+          });
+          throw new Error(data.error);
+        }
+        if (data.error.includes("이메일")) {
+          form.setError("email", { 
+            type: "manual",
+            message: data.error
+          });
+          throw new Error(data.error);
+        }
+        throw new Error(data.error || "계정 생성에 실패했습니다.");
       }
 
-      toast({
-        title: "성공",
-        description: "계정이 생성되었습니다.",
-      });
-
+      toast.success("계정이 성공적으로 생성되었습니다.");
       router.push("/admin");
-    } catch (error: unknown) {
-      toast({
-        title: "오류",
-        description: error instanceof Error ? error.message : "계정 생성 중 오류가 발생했습니다.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
+      router.refresh();
+    } catch (error) {
+      if (error instanceof Error) {
+        toast.error(error.message);
+      } else {
+        toast.error("계정 생성 중 오류가 발생했습니다.");
+      }
     }
-  };
+  }
 
   return (
-    <div className="container max-w-lg mx-auto p-4">
-      <Card>
-        <CardHeader>
-          <div className="flex items-center space-x-2">
+    <div className="max-w-2xl mx-auto p-6">
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-bold">계정 생성</h1>
+        <Button
+          variant="outline"
+          onClick={() => router.push("/admin")}
+        >
+          목록으로
+        </Button>
+      </div>
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <FormField
+            control={form.control}
+            name="name"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>이름</FormLabel>
+                <FormControl>
+                  <Input placeholder="이름을 입력하세요" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="username"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>아이디</FormLabel>
+                <FormControl>
+                  <Input placeholder="아이디를 입력하세요" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="password"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>비밀번호</FormLabel>
+                <FormControl>
+                  <Input type="password" placeholder="비밀번호를 입력하세요" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="confirmPassword"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>비밀번호 확인</FormLabel>
+                <FormControl>
+                  <Input type="password" placeholder="비밀번호를 다시 입력하세요" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="email"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>이메일</FormLabel>
+                <FormControl>
+                  <Input type="email" placeholder="이메일을 입력하세요" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <div className="flex justify-end space-x-4 pt-4">
             <Button
-              variant="ghost"
-              size="icon"
+              type="button"
+              variant="outline"
               onClick={() => router.push("/admin")}
             >
-              <ArrowLeft className="h-4 w-4" />
+              취소
             </Button>
-            <CardTitle>계정 생성</CardTitle>
+            <Button type="submit">계정 생성</Button>
           </div>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">이름</label>
-              <Input
-                required
-                value={formData.name}
-                onChange={(e) =>
-                  setFormData({ ...formData, name: e.target.value })
-                }
-                placeholder="이름 입력"
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">이메일</label>
-              <Input
-                required
-                type="email"
-                value={formData.email}
-                onChange={(e) =>
-                  setFormData({ ...formData, email: e.target.value })
-                }
-                placeholder="이메일 입력"
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">비밀번호</label>
-              <Input
-                required
-                type="password"
-                value={formData.password}
-                onChange={(e) =>
-                  setFormData({ ...formData, password: e.target.value })
-                }
-                placeholder="비밀번호 입력"
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">비밀번호 확인</label>
-              <Input
-                required
-                type="password"
-                value={formData.confirmPassword}
-                onChange={(e) =>
-                  setFormData({ ...formData, confirmPassword: e.target.value })
-                }
-                placeholder="비밀번호 다시 입력"
-              />
-            </div>
-            <div className="flex justify-end space-x-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => router.push("/admin")}
-              >
-                취소
-              </Button>
-              <Button type="submit" disabled={isLoading}>
-                {isLoading ? "생성 중..." : "생성"}
-              </Button>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
+        </form>
+      </Form>
     </div>
   );
 } 

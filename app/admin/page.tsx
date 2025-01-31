@@ -49,13 +49,6 @@ interface Transaction {
   date: string;
 }
 
-interface SelectedUser {
-  id: string;
-  name: string;
-  username: string;
-  points: number;
-}
-
 // 포인트 관리 모달 props 타입 정의
 interface PointManageModalProps {
   user: User;
@@ -144,7 +137,6 @@ export default function AdminPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [totalTransactions, setTotalTransactions] = useState(0);
-  const [selectedUser, setSelectedUser] = useState<SelectedUser | null>(null);
   const [userSearchQuery, setUserSearchQuery] = useState("");
   const [pointAmount, setPointAmount] = useState("");
   const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
@@ -567,7 +559,7 @@ export default function AdminPage() {
     if (!pointModalUser) return;
     await handleManagePoints(pointModalUser.id, action, amount);
     setPointModalUser(null);
-  }, [pointModalUser]);
+  }, [pointModalUser, handleManagePoints]);
 
   return (
     <div className="container mx-auto sm:p-4 p-0">

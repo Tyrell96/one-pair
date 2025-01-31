@@ -1,15 +1,9 @@
 import { NextResponse, NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 
-type RouteParams = {
-  params: {
-    userId: string;
-  };
-};
-
 export async function POST(
   req: NextRequest,
-  { params }: RouteParams
+  { params }: { params: { userId: string } }
 ) {
   try {
     const { userId } = params;

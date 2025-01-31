@@ -56,6 +56,83 @@ interface SelectedUser {
   points: number;
 }
 
+// 포인트 관리 모달 props 타입 정의
+interface PointManageModalProps {
+  user: User;
+  isOpen: boolean;
+  onClose: () => void;
+  onManagePoints: (action: 'add' | 'subtract', amount: number) => void;
+}
+
+// 포인트 관리 모달 컴포넌트
+function PointManageModal({ user, isOpen, onClose, onManagePoints }: PointManageModalProps) {
+  const [amount, setAmount] = useState("");
+  const [action, setAction] = useState<'add' | 'subtract'>('add');
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!amount || parseInt(amount) <= 0) return;
+    onManagePoints(action, parseInt(amount));
+    setAmount("");
+    onClose();
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="bg-background p-6 rounded-lg shadow-lg w-full max-w-md">
+        <h3 className="text-lg font-semibold mb-4">포인트 관리 - {user.name}</h3>
+        <div className="text-sm text-muted-foreground mb-4">
+          현재 포인트: {user.points.toLocaleString()}P
+        </div>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant={action === 'add' ? 'default' : 'outline'}
+                onClick={() => setAction('add')}
+                className="flex-1"
+              >
+                충전
+              </Button>
+              <Button
+                type="button"
+                variant={action === 'subtract' ? 'default' : 'outline'}
+                onClick={() => setAction('subtract')}
+                className="flex-1"
+              >
+                차감
+              </Button>
+            </div>
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">포인트 금액</label>
+            <Input
+              type="number"
+              placeholder="금액 입력"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+            />
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" type="button" onClick={onClose}>
+              취소
+            </Button>
+            <Button 
+              type="submit" 
+              disabled={!amount || parseInt(amount) <= 0 || (action === 'subtract' && parseInt(amount) > user.points)}
+            >
+              확인
+            </Button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 export default function AdminPage() {
   const router = useRouter();
   const { toast } = useToast();
@@ -74,6 +151,9 @@ export default function AdminPage() {
   const [searchType, setSearchType] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTransactionType, setSelectedTransactionType] = useState("all");
+  const [tempSearchQuery, setTempSearchQuery] = useState("");
+  const [pointModalUser, setPointModalUser] = useState<User | null>(null);
+  const [currentAdmin, setCurrentAdmin] = useState<{name: string, username: string} | null>(null);
 
   // 사용자 목록 가져오기
   const fetchUsers = useCallback(async () => {
@@ -132,7 +212,23 @@ export default function AdminPage() {
     try {
       setIsLoadingTransactions(true);
       const token = localStorage.getItem("token");
-      const response = await fetch(`/api/transactions?page=${currentPage}&pageSize=${pageSize}`, {
+      const queryParams = new URLSearchParams({
+        page: currentPage.toString(),
+        pageSize: pageSize.toString(),
+      });
+
+      // 검색 조건 추가
+      if (searchQuery) {
+        queryParams.append('search', searchQuery);
+      }
+      if (searchType !== 'all') {
+        queryParams.append('searchType', searchType);
+      }
+      if (selectedTransactionType !== 'all') {
+        queryParams.append('type', selectedTransactionType);
+      }
+
+      const response = await fetch(`/api/admin/transactions?${queryParams.toString()}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -151,7 +247,24 @@ export default function AdminPage() {
     } finally {
       setIsLoadingTransactions(false);
     }
-  }, [currentPage, pageSize, toast]);
+  }, [currentPage, pageSize, searchQuery, searchType, selectedTransactionType, toast]);
+
+  // 현재 로그인한 관리자 정보 가져오기
+  const fetchCurrentAdmin = useCallback(async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch("/api/users/me", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      if (!response.ok) throw new Error("사용자 정보를 불러올 수 없습니다.");
+      const data = await response.json();
+      setCurrentAdmin({ name: data.name, username: data.username });
+    } catch (error) {
+      console.error("관리자 정보 로딩 에러:", error);
+    }
+  }, []);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -163,6 +276,7 @@ export default function AdminPage() {
         }
 
         await Promise.all([
+          fetchCurrentAdmin(),
           fetchUsers(),
           fetchPointRequests(),
           fetchTransactions()
@@ -177,7 +291,7 @@ export default function AdminPage() {
       }
     };
     checkAuth();
-  }, [router, toast, fetchUsers, fetchPointRequests, fetchTransactions]);
+  }, [router, toast, fetchUsers, fetchPointRequests, fetchTransactions, fetchCurrentAdmin]);
 
   // 관리자 권한 토글
   const toggleAdminRole = async (userId: string, currentRole: string) => {
@@ -371,7 +485,11 @@ export default function AdminPage() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ action, amount }),
+        body: JSON.stringify({ 
+          action, 
+          amount,
+          adminUsername: currentAdmin?.username || 'ADMIN' 
+        }),
       });
 
       if (!response.ok) {
@@ -410,6 +528,47 @@ export default function AdminPage() {
     }
   }, [userSearchQuery, users]);
 
+  // 검색 조건이 변경될 때마다 거래 내역을 다시 불러오기
+  useEffect(() => {
+    fetchTransactions();
+  }, [fetchTransactions, searchQuery, searchType, selectedTransactionType]);
+
+  // 검색 실행 함수
+  const handleSearch = useCallback(() => {
+    setSearchQuery(tempSearchQuery);
+  }, [tempSearchQuery]);
+
+  // 엔터키 처리 함수
+  const handleKeyPress = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      handleSearch();
+    }
+  }, [handleSearch]);
+
+  // 검색 타입 변경 처리
+  const handleSearchTypeChange = useCallback((value: string) => {
+    setSearchType(value);
+    setCurrentPage(1);
+    // 검색어가 있는 경우에만 자동 검색 실행
+    if (searchQuery.trim()) {
+      fetchTransactions();
+    }
+  }, [searchQuery, fetchTransactions]);
+
+  // 거래 유형 변경 처리
+  const handleTransactionTypeChange = useCallback((value: string) => {
+    setSelectedTransactionType(value);
+    setCurrentPage(1);
+    fetchTransactions();
+  }, [fetchTransactions]);
+
+  // 포인트 관리 모달 핸들러
+  const handlePointManage = useCallback(async (action: 'add' | 'subtract', amount: number) => {
+    if (!pointModalUser) return;
+    await handleManagePoints(pointModalUser.id, action, amount);
+    setPointModalUser(null);
+  }, [pointModalUser]);
+
   return (
     <div className="container mx-auto sm:p-4 p-0">
       <div className="flex justify-between items-center mb-6 p-4 sm:p-0 border-b sm:border-0">
@@ -444,7 +603,7 @@ export default function AdminPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>요청일</TableHead>
-                    <TableHead>사용자</TableHead>
+                    <TableHead>사용자(ID)</TableHead>
                     <TableHead>유형</TableHead>
                     <TableHead>금액</TableHead>
                     <TableHead>상태</TableHead>
@@ -457,8 +616,7 @@ export default function AdminPage() {
                       <TableRow key={request.id}>
                         <TableCell>{new Date(request.createdAt).toLocaleDateString()}</TableCell>
                         <TableCell>
-                          <div>{request.user.name}</div>
-                          <div className="text-sm text-muted-foreground">{request.user.username}</div>
+                          <div>{request.user.name}({request.user.username})</div>
                         </TableCell>
                         <TableCell>{request.type === "charge" ? "충전" : "출금"}</TableCell>
                         <TableCell>{request.amount.toLocaleString()}P</TableCell>
@@ -519,7 +677,10 @@ export default function AdminPage() {
             </CardHeader>
             <CardContent>
               <div className="flex flex-col sm:flex-row gap-2 mb-4">
-                <Select value={searchType} onValueChange={setSearchType}>
+                <Select 
+                  value={searchType} 
+                  onValueChange={handleSearchTypeChange}
+                >
                   <SelectTrigger className="w-[180px]">
                     <SelectValue placeholder="검색 대상 선택" />
                   </SelectTrigger>
@@ -529,14 +690,10 @@ export default function AdminPage() {
                     <SelectItem value="receiver">받은 사람</SelectItem>
                   </SelectContent>
                 </Select>
-                <div className="flex-1">
-                  <Input
-                    placeholder="검색어 입력..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                  />
-                </div>
-                <Select value={selectedTransactionType} onValueChange={setSelectedTransactionType}>
+                <Select 
+                  value={selectedTransactionType} 
+                  onValueChange={handleTransactionTypeChange}
+                >
                   <SelectTrigger className="w-[180px]">
                     <SelectValue placeholder="거래 유형 선택" />
                   </SelectTrigger>
@@ -548,6 +705,20 @@ export default function AdminPage() {
                     <SelectItem value="transfer">일반 전송</SelectItem>
                   </SelectContent>
                 </Select>
+                <div className="flex-1 flex gap-2">
+                  <Input
+                    placeholder="검색어 입력..."
+                    value={tempSearchQuery}
+                    onChange={(e) => setTempSearchQuery(e.target.value)}
+                    onKeyPress={handleKeyPress}
+                  />
+                  <Button 
+                    variant="secondary"
+                    onClick={handleSearch}
+                  >
+                    검색
+                  </Button>
+                </div>
                 <Select 
                   value={pageSize.toString()} 
                   onValueChange={(value) => {
@@ -699,12 +870,41 @@ export default function AdminPage() {
                                 <Button
                                   variant="outline"
                                   size="sm"
-                                  onClick={() => setSelectedUser({
-                                    id: user.id,
-                                    name: user.name,
-                                    username: user.username,
-                                    points: user.points,
-                                  })}
+                                  onClick={() => setPointModalUser(user)}
+                                >
+                                  선택
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+
+                  {/* 전체 사용자 목록 */}
+                  {!userSearchQuery && (
+                    <div className="border rounded-md">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>이름</TableHead>
+                            <TableHead>아이디</TableHead>
+                            <TableHead>현재 포인트</TableHead>
+                            <TableHead>선택</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {users.map((user) => (
+                            <TableRow key={user.id}>
+                              <TableCell>{user.name}</TableCell>
+                              <TableCell>{user.username}</TableCell>
+                              <TableCell>{user.points.toLocaleString()}P</TableCell>
+                              <TableCell>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => setPointModalUser(user)}
                                 >
                                   선택
                                 </Button>
@@ -718,16 +918,16 @@ export default function AdminPage() {
                 </div>
 
                 {/* 선택된 사용자 정보 및 포인트 관리 */}
-                {selectedUser && (
+                {pointModalUser && (
                   <div className="border rounded-md p-4 space-y-4">
                     <div className="flex justify-between items-center">
                       <div>
-                        <h3 className="text-lg font-semibold">{selectedUser.name}</h3>
-                        <p className="text-sm text-muted-foreground">{selectedUser.username}</p>
+                        <h3 className="text-lg font-semibold">{pointModalUser.name}</h3>
+                        <p className="text-sm text-muted-foreground">{pointModalUser.username}</p>
                       </div>
                       <div className="text-right">
                         <div className="text-sm text-muted-foreground">현재 포인트</div>
-                        <div className="text-xl font-bold">{selectedUser.points.toLocaleString()}P</div>
+                        <div className="text-xl font-bold">{pointModalUser.points.toLocaleString()}P</div>
                       </div>
                     </div>
 
@@ -745,13 +945,13 @@ export default function AdminPage() {
                         <Button
                           className="flex-1"
                           onClick={() => {
-                            handleManagePoints(selectedUser.id, "add", parseInt(pointAmount));
+                            handleManagePoints(pointModalUser.id, "add", parseInt(pointAmount));
                             setPointAmount("");
                             // 사용자 정보 업데이트
-                            const updatedUser = users.find(u => u.id === selectedUser.id);
+                            const updatedUser = users.find(u => u.id === pointModalUser.id);
                             if (updatedUser) {
-                              setSelectedUser({
-                                ...selectedUser,
+                              setPointModalUser({
+                                ...pointModalUser,
                                 points: updatedUser.points,
                               });
                             }
@@ -764,18 +964,18 @@ export default function AdminPage() {
                           className="flex-1"
                           variant="destructive"
                           onClick={() => {
-                            handleManagePoints(selectedUser.id, "subtract", parseInt(pointAmount));
+                            handleManagePoints(pointModalUser.id, "subtract", parseInt(pointAmount));
                             setPointAmount("");
                             // 사용자 정보 업데이트
-                            const updatedUser = users.find(u => u.id === selectedUser.id);
+                            const updatedUser = users.find(u => u.id === pointModalUser.id);
                             if (updatedUser) {
-                              setSelectedUser({
-                                ...selectedUser,
+                              setPointModalUser({
+                                ...pointModalUser,
                                 points: updatedUser.points,
                               });
                             }
                           }}
-                          disabled={!pointAmount || parseInt(pointAmount) <= 0 || parseInt(pointAmount) > selectedUser.points}
+                          disabled={!pointAmount || parseInt(pointAmount) <= 0 || parseInt(pointAmount) > pointModalUser.points}
                         >
                           차감
                         </Button>
@@ -861,16 +1061,10 @@ export default function AdminPage() {
                               비밀번호 초기화
                             </DropdownMenuItem>
                             <DropdownMenuItem
-                              onClick={() => handleManagePoints(user.id, "add", 0)}
+                              onClick={() => setPointModalUser(user)}
                             >
                               <DollarSign className="mr-2 h-4 w-4" />
-                              포인트 충전
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => handleManagePoints(user.id, "subtract", 0)}
-                            >
-                              <DollarSign className="mr-2 h-4 w-4" />
-                              포인트 차감
+                              포인트 관리
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
@@ -892,6 +1086,16 @@ export default function AdminPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* 포인트 관리 모달 */}
+      {pointModalUser && (
+        <PointManageModal
+          user={pointModalUser}
+          isOpen={!!pointModalUser}
+          onClose={() => setPointModalUser(null)}
+          onManagePoints={handlePointManage}
+        />
+      )}
     </div>
   );
 } 

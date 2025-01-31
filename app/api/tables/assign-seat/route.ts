@@ -28,8 +28,8 @@ export async function POST(request: Request) {
     }
 
     // 사용 가능한 테이블과 좌석 찾기
-    const availableSeats = tables.flatMap(table => {
-      const assignedSeats = new Set(table.seatAssignments.map(a => a.seatNumber));
+    const availableSeats = tables.flatMap((table: { id: string; name: string; seats: number; seatAssignments: { seatNumber: number }[] }) => {
+      const assignedSeats = new Set(table.seatAssignments.map((a: { seatNumber: number }) => a.seatNumber));
       const availableSeatsForTable = Array.from(
         { length: table.seats },
         (_, i) => i + 1

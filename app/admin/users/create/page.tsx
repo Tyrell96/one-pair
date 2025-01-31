@@ -33,6 +33,8 @@ export default function CreateUserPage() {
 
     setIsLoading(true);
     try {
+      console.log("계정 생성 시도:", { name: formData.name, email: formData.email });
+      
       const token = localStorage.getItem("token");
       const response = await fetch("/api/users", {
         method: "POST",
@@ -47,9 +49,13 @@ export default function CreateUserPage() {
         }),
       });
 
+      const data = await response.json();
+
       if (!response.ok) {
-        throw new Error("계정 생성에 실패했습니다.");
+        throw new Error(data.error || "계정 생성에 실패했습니다.");
       }
+
+      console.log("계정 생성 성공:", data);
 
       toast({
         title: "성공",
@@ -58,6 +64,7 @@ export default function CreateUserPage() {
 
       router.push("/admin");
     } catch (error: unknown) {
+      console.error("계정 생성 에러:", error);
       toast({
         title: "오류",
         description: error instanceof Error ? error.message : "계정 생성 중 오류가 발생했습니다.",
@@ -137,6 +144,7 @@ export default function CreateUserPage() {
                 type="button"
                 variant="outline"
                 onClick={() => router.push("/admin")}
+                disabled={isLoading}
               >
                 취소
               </Button>

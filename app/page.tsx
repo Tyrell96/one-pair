@@ -16,6 +16,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { useRouter } from "next/navigation";
 import jwt from "jsonwebtoken";
 import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface Transaction {
   id: string;
@@ -86,7 +87,7 @@ export default function HomePage() {
   const [isPointRequestOpen, setIsPointRequestOpen] = useState(false);
   const [pointRequestAmount, setPointRequestAmount] = useState("");
   const [pointRequestType, setPointRequestType] = useState<'charge' | 'withdraw'>('charge');
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [dailyPointData, setDailyPointData] = useState<DailyPointData[]>([]);
   const [hourlyPointData, setHourlyPointData] = useState<HourlyPointData[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -177,60 +178,69 @@ export default function HomePage() {
     );
   }, []);
 
-  const checkAuth = useCallback(async () => {
+  const fetchUserInfo = useCallback(async () => {
     try {
       const token = localStorage.getItem("token");
-      const storedUser = localStorage.getItem("user");
-
-      if (!token || !storedUser) {
-        router.push("/sign-in");
+      if (!token) {
+        setIsLoading(false);
+        router.replace("/sign-in");
         return;
       }
 
-      // 먼저 저장된 사용자 정보 표시
-      const cachedUser = JSON.parse(storedUser);
-      setUser(cachedUser);
+      const response = await fetch("/api/users/me", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
 
-      // 백그라운드에서 최신 데이터 가져오기
-      const [userResponse, historyResponse] = await Promise.all([
-        fetch("/api/users/me", {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }),
-        fetch("/api/transactions", {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }),
-      ]);
-
-      if (!userResponse.ok || !historyResponse.ok) {
-        throw new Error("데이터를 불러올 수 없습니다.");
+      if (!response.ok) {
+        if (response.status === 401) {
+          localStorage.removeItem("token");
+          setIsLoading(false);
+          router.replace("/sign-in");
+          return;
+        }
+        throw new Error("사용자 정보를 불러올 수 없습니다.");
       }
 
-      const [userData, historyData] = await Promise.all([
-        userResponse.json(),
-        historyResponse.json(),
-      ]);
-
+      const userData = await response.json();
       setUser(userData);
-      setPointHistory(historyData.transactions);
-      processPointHistory(historyData.transactions);
-    } catch (error: unknown) {
-      console.error("인증 체크 에러:", error);
+      localStorage.setItem("user", JSON.stringify(userData));
+    } catch (error) {
+      console.error("사용자 정보 로딩 에러:", error);
+      localStorage.removeItem("token");
+      setIsLoading(false);
+      router.replace("/sign-in");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [router]);
+
+  useEffect(() => {
+    fetchUserInfo();
+  }, [fetchUserInfo]);
+
+  const refreshPoints = useCallback(async () => {
+    if (isRefreshing) return;
+    
+    setIsRefreshing(true);
+    try {
+      await fetchUserInfo();
+      toast({
+        title: "새로고침 완료",
+        description: "포인트 정보가 업데이트되었습니다.",
+      });
+    } catch (error) {
+      console.error("포인트 새로고침 에러:", error);
       toast({
         title: "오류",
-        description: error instanceof Error ? error.message : "사용자 정보를 불러오는데 실패했습니다.",
+        description: "포인트 정보 새로고침에 실패했습니다.",
         variant: "destructive",
       });
+    } finally {
+      setIsRefreshing(false);
     }
-  }, [router, toast, processPointHistory]);
-
-  // 사용자 인증 체크 및 정보 로드
-  useEffect(() => {
-    checkAuth();
-  }, [checkAuth]);
+  }, [fetchUserInfo, isRefreshing, toast]);
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
@@ -506,57 +516,6 @@ export default function HomePage() {
     }
   }, [handleAddPlayer]);
 
-  const refreshPoints = useCallback(async () => {
-    if (isRefreshing || !user?.id) return;
-    
-    setIsRefreshing(true);
-    try {
-      const token = localStorage.getItem("token");
-      const [userResponse, historyResponse] = await Promise.all([
-        fetch("/api/users/me", {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
-        fetch(`/api/transactions?userId=${user.id}&page=1&pageSize=10`, {
-          headers: { Authorization: `Bearer ${token}` },
-        })
-      ]);
-
-      if (userResponse.ok && historyResponse.ok) {
-        const [userData, historyData] = await Promise.all([
-          userResponse.json(),
-          historyResponse.json()
-        ]);
-
-        // 데이터가 올바른 형식인지 확인
-        if (userData && userData.user && typeof userData.user.points === 'number') {
-          setUser(userData.user);
-          localStorage.setItem("user", JSON.stringify(userData.user));
-
-          // 포인트 내역 데이터 업데이트
-          if (historyData && Array.isArray(historyData.transactions)) {
-            processPointHistory(historyData.transactions);
-          }
-        }
-
-        setLastRefreshTime(new Date());
-        
-        toast({
-          title: "새로고침 완료",
-          description: "포인트 정보가 업데이트되었습니다.",
-        });
-      }
-    } catch (error: unknown) {
-      console.error("포인트 새로고침 에러:", error);
-      toast({
-        title: "오류",
-        description: error instanceof Error ? error.message : "포인트 정보를 불러오는데 실패했습니다.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsRefreshing(false);
-    }
-  }, [toast, user?.id, processPointHistory, isRefreshing]);
-
   const handleSelectProduct = useCallback((product: string, price: number) => {
     setSelectedProduct(product);
     setSelectedAmount(price);
@@ -657,17 +616,72 @@ export default function HomePage() {
     checkTokenExpiration();
   }, [checkTokenExpiration]);
 
-  // 로딩 상태 표시
-  if (!user) {
+  if (isLoading) {
     return (
       <div className="container mx-auto p-4">
-        <Card>
-          <CardContent className="p-8 text-center">
-            로딩 중...
-          </CardContent>
-        </Card>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {/* 포인트 카드 스켈레톤 */}
+          <Card>
+            <CardHeader>
+              <Skeleton className="h-6 w-24" />
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <Skeleton className="h-8 w-32" />
+                <div className="flex justify-end">
+                  <Skeleton className="h-9 w-24" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* 거래 내역 카드 스켈레톤 */}
+          <Card>
+            <CardHeader>
+              <Skeleton className="h-6 w-32" />
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="flex justify-between items-center">
+                    <Skeleton className="h-4 w-40" />
+                    <Skeleton className="h-4 w-20" />
+                  </div>
+                ))}
+                <div className="flex justify-end">
+                  <Skeleton className="h-9 w-24" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* 포인트 요청 카드 스켈레톤 */}
+          <Card>
+            <CardHeader>
+              <Skeleton className="h-6 w-32" />
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {[1, 2].map((i) => (
+                  <div key={i} className="flex justify-between items-center">
+                    <Skeleton className="h-4 w-32" />
+                    <Skeleton className="h-4 w-16" />
+                  </div>
+                ))}
+                <div className="flex justify-end space-x-2">
+                  <Skeleton className="h-9 w-24" />
+                  <Skeleton className="h-9 w-24" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     );
+  }
+
+  if (!user) {
+    return null;
   }
 
   return (

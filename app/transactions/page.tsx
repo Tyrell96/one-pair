@@ -94,7 +94,7 @@ export default function TransactionsPage() {
       setDailyStats(
         Object.entries(dailyData).map(([date, total]) => ({
           date,
-          total,
+          total: Number(total),
         }))
       );
 
@@ -109,7 +109,7 @@ export default function TransactionsPage() {
       setMonthlyStats(
         Object.entries(monthlyData).map(([month, total]) => ({
           month,
-          total,
+          total: Number(total),
         }))
       );
     } catch (error: unknown) {

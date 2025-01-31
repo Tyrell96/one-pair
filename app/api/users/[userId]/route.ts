@@ -2,18 +2,19 @@ import { NextResponse, NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 
-type RouteParams = {
-  params: {
+interface RouteContext {
+  params: Promise<{
     userId: string;
-  };
-};
+  }>;
+}
 
 // 사용자 삭제
 export async function DELETE(
   req: NextRequest,
-  { params }: RouteParams
+  context: RouteContext
 ) {
   try {
+    const params = await context.params;
     const { userId } = params;
 
     await prisma.user.delete({
@@ -35,9 +36,10 @@ export async function DELETE(
 // 비밀번호 초기화
 export async function PATCH(
   req: NextRequest,
-  { params }: RouteParams
+  context: RouteContext
 ) {
   try {
+    const params = await context.params;
     const { userId } = params;
     const { action } = await req.json();
 

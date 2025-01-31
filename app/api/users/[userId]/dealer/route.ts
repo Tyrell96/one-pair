@@ -1,17 +1,18 @@
 import { NextResponse, NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 
-type RouteParams = {
-  params: {
+interface RouteContext {
+  params: Promise<{
     userId: string;
-  };
-};
+  }>;
+}
 
 export async function PATCH(
   req: NextRequest,
-  { params }: RouteParams
+  context: RouteContext
 ) {
   try {
+    const params = await context.params;
     const { userId } = params;
     const { isDealer } = await req.json();
 

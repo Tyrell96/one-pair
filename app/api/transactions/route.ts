@@ -1,9 +1,24 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import jwt from "jsonwebtoken";
-import { Prisma } from "@prisma/client";
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+
+interface Transaction {
+  id: string;
+  type: string;
+  amount: number;
+  description?: string | null;
+  createdAt: Date;
+  senderId: string;
+  receiverId: string;
+  sender: {
+    name: string;
+  };
+  receiver: {
+    name: string;
+  };
+}
 
 interface JwtPayload {
   id: string;
@@ -38,9 +53,8 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const page = parseInt(searchParams.get('page') || '1');
     const pageSize = parseInt(searchParams.get('pageSize') || '10');
-
     // 포인트 내역 조회
-    const where: Prisma.PointTransactionWhereInput = {
+    const where = {
       OR: [
         { senderId: userId },
         { receiverId: userId }
@@ -72,9 +86,8 @@ export async function GET(request: Request) {
     const total = await prisma.pointTransaction.count({
       where,
     });
-
     // 응답 데이터 포맷팅
-    const formattedTransactions = transactions.map(tx => {
+    const formattedTransactions = transactions.map((tx: Transaction) => {
       let amount = tx.amount;
       let description = tx.description || '';
 

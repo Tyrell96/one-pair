@@ -14,7 +14,7 @@ export async function POST(
   try {
     const params = await context.params;
     const { userId } = params;
-    const { action, amount } = await req.json();
+    const { action, amount, description } = await req.json();
 
     // 사용자 확인
     const user = await prisma.user.findUnique({
@@ -72,9 +72,7 @@ export async function POST(
           amount: amount,
           senderId: action === "add" ? admin.id : userId,
           receiverId: action === "add" ? userId : admin.id,
-          description: action === "add" 
-            ? `관리자가 ${user.name}님의 포인트를 충전 (${amount.toLocaleString()}P)`
-            : `관리자가 ${user.name}님의 포인트를 차감 (${amount.toLocaleString()}P)`,
+          description: description,
         },
       });
 

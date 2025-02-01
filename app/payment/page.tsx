@@ -18,7 +18,7 @@ import {
 interface User {
   id: string;
   name: string;
-  isDealer: boolean;
+  points: number;
 }
 
 export default function PaymentPage() {
@@ -27,6 +27,29 @@ export default function PaymentPage() {
   const [amount, setAmount] = useState("");
   const [selectedDealer, setSelectedDealer] = useState("");
   const [dealers, setDealers] = useState<User[]>([]);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+
+  const fetchCurrentUser = useCallback(async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch("/api/users/me", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        cache: 'no-store'
+      });
+      if (!response.ok) throw new Error("사용자 정보를 불러올 수 없습니다.");
+      const data = await response.json();
+      setCurrentUser(data);
+    } catch (error: unknown) {
+      console.error("사용자 정보 로딩 에러:", error);
+      toast({
+        title: "오류",
+        description: "사용자 정보를 불러오는데 실패했습니다.",
+        variant: "destructive",
+      });
+    }
+  }, [toast]);
 
   const fetchDealers = useCallback(async () => {
     try {
@@ -50,8 +73,9 @@ export default function PaymentPage() {
   }, [toast]);
 
   useEffect(() => {
+    fetchCurrentUser();
     fetchDealers();
-  }, [fetchDealers]);
+  }, [fetchCurrentUser, fetchDealers]);
 
   const handlePayment = useCallback(async () => {
     if (!selectedDealer) {
@@ -72,6 +96,15 @@ export default function PaymentPage() {
       return;
     }
 
+    if (!currentUser || parseInt(amount) > currentUser.points) {
+      toast({
+        title: "오류",
+        description: "보유 포인트가 부족합니다.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       const token = localStorage.getItem("token");
       const response = await fetch("/api/payment/dealer", {
@@ -87,7 +120,8 @@ export default function PaymentPage() {
       });
 
       if (!response.ok) {
-        throw new Error("포인트 전달에 실패했습니다.");
+        const error = await response.json();
+        throw new Error(error.error || "포인트 전달에 실패했습니다.");
       }
 
       const selectedDealerInfo = dealers.find(d => d.id === selectedDealer);
@@ -102,11 +136,11 @@ export default function PaymentPage() {
       console.error("포인트 전달 에러:", error);
       toast({
         title: "오류",
-        description: "포인트 전달 중 오류가 발생했습니다.",
+        description: error instanceof Error ? error.message : "포인트 전달 중 오류가 발생했습니다.",
         variant: "destructive",
       });
     }
-  }, [selectedDealer, amount, dealers, toast, router]);
+  }, [selectedDealer, amount, dealers, currentUser, toast, router]);
 
   return (
     <div className="container mx-auto sm:p-4 p-0">
@@ -160,10 +194,17 @@ export default function PaymentPage() {
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
               />
-              <Button onClick={handlePayment}>
+              <Button 
+                onClick={handlePayment}
+                disabled={!selectedDealer || !amount || parseInt(amount) <= 0 || !currentUser || parseInt(amount) > currentUser.points}
+              >
                 <Send className="mr-2 h-4 w-4" />
                 전달하기
               </Button>
+            </div>
+            <div className="text-sm text-muted-foreground flex items-center gap-2 mt-1">
+              <span>현재 보유 포인트:</span>
+              <span className="font-medium">{currentUser?.points?.toLocaleString() || 0}P</span>
             </div>
           </div>
 

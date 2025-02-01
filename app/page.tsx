@@ -89,7 +89,6 @@ export default function HomePage() {
   const [pointRequestType, setPointRequestType] = useState<'charge' | 'withdraw'>('charge');
   const [isLoading, setIsLoading] = useState(true);
   const [dailyPointData, setDailyPointData] = useState<DailyPointData[]>([]);
-  const [hourlyPointData, setHourlyPointData] = useState<HourlyPointData[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastRefreshTime, setLastRefreshTime] = useState<Date | null>(null);
   const [isUsePointOpen, setIsUsePointOpen] = useState(false);
@@ -98,71 +97,53 @@ export default function HomePage() {
 
   const processPointHistory = useCallback((transactions: Transaction[]) => {
     const dailyMap = new Map<string, number>();
-    const hourlyMap = new Map<string, number>();
 
-    // 거래 내역을 날짜 기준으로 정렬 (최신 순)
+    // 거래 내역을 날짜 기준으로 정렬 (과거순)
     const sortedTransactions = [...transactions].sort((a, b) => 
-      new Date(b.date).getTime() - new Date(a.date).getTime()
+      new Date(a.date).getTime() - new Date(b.date).getTime()
     );
 
     // 최근 7일 동안의 날짜 배열 생성
     const last7Days = Array.from({length: 7}, (_, i) => {
       const date = new Date();
-      date.setDate(date.getDate() - i);
+      date.setDate(date.getDate() - (6 - i)); // 7일 전부터 오늘까지
       return date.toISOString().split('T')[0];
-    }).reverse();
-
-    // 최근 24시간의 시간 배열 생성
-    const last24Hours = Array.from({length: 24}, (_, i) => {
-      const hour = String(i).padStart(2, '0');
-      return `${hour}`;
     });
 
-    // 일별 변동량 계산
+    // 시작 포인트 (가장 오래된 거래 이전의 포인트)
+    let runningTotal = 0;
+
+    // 각 날짜별 최종 포인트 계산
     last7Days.forEach(dateKey => {
+      // 해당 날짜의 거래들
       const dayTransactions = sortedTransactions.filter(tx => 
         new Date(tx.date).toISOString().split('T')[0] === dateKey
       );
-      
-      const dayTotal = dayTransactions.reduce((sum, tx) => sum + tx.amount, 0);
-      dailyMap.set(dateKey, dayTotal);
+
+      // 해당 날짜의 거래들을 시간순으로 처리
+      dayTransactions.forEach(tx => {
+        if (tx.type === "충전" || tx.type === "받기") {
+          runningTotal += tx.amount;
+        } else if (tx.type === "출금" || tx.type === "사용" || tx.type === "전달") {
+          runningTotal = Math.max(0, runningTotal - tx.amount);
+        }
+      });
+
+      // 해당 날짜의 최종 포인트 저장
+      dailyMap.set(dateKey, runningTotal);
     });
 
-    // 시간별 변동량 계산
-    const now = new Date();
-    const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-
-    last24Hours.forEach(hourKey => {
-      const [hour] = hourKey.split(':');
-      const currentHourTotal = sortedTransactions
-        .filter(tx => {
-          const txDate = new Date(tx.date);
-          const txHour = txDate.getHours();
-          return txHour === parseInt(hour) && txDate >= oneDayAgo;
-        })
-        .reduce((sum, tx) => sum + tx.amount, 0);
-      
-      hourlyMap.set(hourKey, currentHourTotal || 0);
-    });
+    // 마지막 날(오늘)은 현재 실제 포인트로 업데이트
+    if (last7Days.length > 0) {
+      dailyMap.set(last7Days[last7Days.length - 1], user?.points || 0);
+    }
 
     // 일별 데이터 설정
     setDailyPointData(
       Array.from(dailyMap.entries())
-        .map(([date, points]) => ({ 
+        .map(([date, points]) => ({
           date,
-          points,
-          label: formatDateLabel(date)
-        }))
-        .sort((a, b) => a.date.localeCompare(b.date))
-    );
-
-    // 시간별 데이터 설정
-    setHourlyPointData(
-      Array.from(hourlyMap.entries())
-        .map(([hour, points]) => ({ 
-          hour,
-          points,
-          label: hour
+          points: Math.max(0, points),
         }))
     );
 
@@ -176,7 +157,7 @@ export default function HomePage() {
         date: formatDate(tx.date)
       }))
     );
-  }, []);
+  }, [user?.points]);
 
   const fetchUserInfo = useCallback(async () => {
     try {
@@ -789,72 +770,53 @@ export default function HomePage() {
                   <CardTitle className="text-lg sm:text-xl">포인트 변동 그래프</CardTitle>
                 </CardHeader>
                 <CardContent className="px-0 sm:px-6">
-                  <Tabs defaultValue="daily">
-                    <TabsList className="w-full grid grid-cols-2">
-                      <TabsTrigger value="daily">일별 보유량</TabsTrigger>
-                      <TabsTrigger value="hourly">시간별 변동</TabsTrigger>
-                    </TabsList>
-                    <TabsContent value="daily">
-                      <div className="h-[300px] mt-4">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <LineChart data={dailyPointData}>
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis 
-                              dataKey="date" 
-                              tickFormatter={(value) => {
-                                if (!value) return '';
-                                const date = new Date(value);
-                                return `${date.getMonth() + 1}/${date.getDate()}`;
-                              }}
-                              interval={0}
-                            />
-                            <YAxis />
-                            <Tooltip 
-                              labelFormatter={(value) => value ? formatDate(value) : ''}
-                              formatter={(value: number) => [value.toLocaleString() + 'P', '보유 포인트']}
-                            />
-                            <Line 
-                              type="monotone" 
-                              dataKey="points" 
-                              name="보유 포인트"
-                              stroke="#2563eb" 
-                              strokeWidth={2}
-                              dot={{ r: 4 }}
-                            />
-                          </LineChart>
-                        </ResponsiveContainer>
-                      </div>
-                    </TabsContent>
-                    <TabsContent value="hourly">
-                      <div className="h-[300px] mt-4">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <LineChart data={hourlyPointData}>
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis 
-                              dataKey="hour"
-                              interval={0}
-                              angle={0}
-                              tickFormatter={(value) => value.split(':')[0]} // 시간만 표시
-                              height={30}
-                              tick={{ fontSize: 12 }}
-                            />
-                            <YAxis />
-                            <Tooltip 
-                              labelFormatter={(value) => `${value.split(':')[0]}시`}
-                              formatter={(value: number) => [value.toLocaleString() + 'P', '변동 포인트']}
-                            />
-                            <Line 
-                              type="monotone" 
-                              dataKey="points" 
-                              stroke="#2563eb" 
-                              strokeWidth={2}
-                              dot={{ r: 3 }}
-                            />
-                          </LineChart>
-                        </ResponsiveContainer>
-                      </div>
-                    </TabsContent>
-                  </Tabs>
+                  <div className="h-[300px] mt-4">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart 
+                        data={dailyPointData}
+                        margin={{
+                          top: 5,
+                          right: 30,
+                          left: 20,
+                          bottom: 20
+                        }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis 
+                          dataKey="date" 
+                          tickFormatter={(value) => {
+                            if (!value) return '';
+                            const date = new Date(value);
+                            return `${date.getMonth() + 1}/${date.getDate()}`;
+                          }}
+                          interval={0}
+                          angle={-45}
+                          textAnchor="end"
+                          height={60}
+                          tick={{ fontSize: 12 }}
+                        />
+                        <YAxis 
+                          tickFormatter={(value) => `${value.toLocaleString()}P`}
+                          domain={[0, 'dataMax']}
+                          tick={{ fontSize: 12 }}
+                          allowDataOverflow={false}
+                          minTickGap={20}
+                        />
+                        <Tooltip 
+                          labelFormatter={(value) => value ? formatDate(value) : ''}
+                          formatter={(value: number) => [`${value.toLocaleString()}P`, '보유 포인트']}
+                        />
+                        <Line 
+                          type="monotone" 
+                          dataKey="points" 
+                          name="보유 포인트"
+                          stroke="#2563eb" 
+                          strokeWidth={2}
+                          dot={{ r: 4 }}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
                 </CardContent>
               </Card>
             </TabsContent>
@@ -871,7 +833,9 @@ export default function HomePage() {
                         className="flex justify-between items-center p-3 bg-gray-50 rounded"
                       >
                         <div>
-                          <div className="font-medium">{history.description || '내역 없음'}</div>
+                          <div className={`font-medium ${history.type === "전달" ? "text-blue-600" : ""}`}>
+                            {history.description || '내역 없음'}
+                          </div>
                           <div className="text-sm text-gray-500">
                             {history.date ? formatDate(history.date) : '-'}
                           </div>

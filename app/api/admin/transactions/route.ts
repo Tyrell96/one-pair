@@ -8,7 +8,7 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const search = searchParams.get('search');
     const type = searchParams.get('type');
-    const searchType = searchParams.get('searchType') || 'all'; // 'sender', 'receiver', 'all'
+    const searchType = searchParams.get('searchType') || 'all';
     const page = parseInt(searchParams.get('page') || '1');
     const pageSize = parseInt(searchParams.get('pageSize') || '10');
 
@@ -20,14 +20,14 @@ export async function GET(request: Request) {
         where.sender = {
           OR: [
             { name: { contains: search } },
-            { id: { contains: search } }
+            { username: { contains: search } }
           ]
         };
       } else if (searchType === 'receiver') {
         where.receiver = {
           OR: [
             { name: { contains: search } },
-            { id: { contains: search } }
+            { username: { contains: search } }
           ]
         };
       } else {
@@ -36,7 +36,7 @@ export async function GET(request: Request) {
             sender: {
               OR: [
                 { name: { contains: search } },
-                { id: { contains: search } }
+                { username: { contains: search } }
               ]
             }
           },
@@ -44,7 +44,7 @@ export async function GET(request: Request) {
             receiver: {
               OR: [
                 { name: { contains: search } },
-                { id: { contains: search } }
+                { username: { contains: search } }
               ]
             }
           }
@@ -56,22 +56,31 @@ export async function GET(request: Request) {
       where.type = type;
     }
 
-    // 포인트 내역 조회
+    // 포인트 내역 조회 (User 테이블과 Join)
     const transactions = await prisma.pointTransaction.findMany({
       where,
-      include: {
+      select: {
+        id: true,
+        type: true,
+        amount: true,
+        description: true,
+        createdAt: true,
+        senderId: true,
+        receiverId: true,
         sender: {
           select: {
+            id: true,
             name: true,
             username: true,
-          },
+          }
         },
         receiver: {
           select: {
+            id: true,
             name: true,
             username: true,
-          },
-        },
+          }
+        }
       },
       orderBy: {
         createdAt: 'desc',
@@ -86,21 +95,28 @@ export async function GET(request: Request) {
     });
 
     // 응답 데이터 포맷팅
-    const formattedTransactions = transactions.map(tx => ({
-      id: tx.id,
-      type: tx.type,
-      amount: tx.amount,
-      senderName: tx.sender.name,
-      senderUsername: tx.sender.username,
-      receiverName: tx.receiver.name,
-      receiverUsername: tx.receiver.username,
-      description: tx.type === 'transfer' 
-        ? `${tx.sender.name}님이 ${tx.receiver.name}님에게 포인트 전달`
-        : tx.type === 'charge'
-        ? `${tx.receiver.name}님 포인트 충전`
-        : `${tx.sender.name}님 포인트 출금`,
-      date: tx.createdAt,
-    }));
+    const formattedTransactions = transactions.map(tx => {
+      // sender와 receiver 정보 처리
+      const senderInfo = tx.sender 
+        ? { name: tx.sender.name, username: tx.sender.username }
+        : { name: "시스템", username: "-" };
+      
+      const receiverInfo = tx.receiver
+        ? { name: tx.receiver.name, username: tx.receiver.username }
+        : { name: "시스템", username: "-" };
+
+      return {
+        id: tx.id,
+        type: tx.type,
+        amount: tx.amount,
+        description: tx.description,
+        date: tx.createdAt,
+        senderName: senderInfo.name,
+        senderUsername: senderInfo.username,
+        receiverName: receiverInfo.name,
+        receiverUsername: receiverInfo.username
+      };
+    });
 
     return NextResponse.json({
       transactions: formattedTransactions,

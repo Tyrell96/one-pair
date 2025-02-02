@@ -11,7 +11,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 
 interface User {
   id: string;
@@ -945,51 +946,56 @@ export default function AdminPage() {
       </Tabs>
 
       <Dialog open={isPointDialogOpen} onOpenChange={setIsPointDialogOpen}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-[425px] w-[95vw] rounded-t-lg sm:rounded-lg">
           <DialogHeader>
             <DialogTitle>포인트 관리</DialogTitle>
           </DialogHeader>
           {selectedUserForPoints && (
-            <div className="space-y-4">
+            <div className="space-y-4 p-4">
               <div className="flex justify-between items-center">
                 <div>
-                  <h3 className="font-semibold">{selectedUserForPoints.name}</h3>
-                  <p className="text-sm text-muted-foreground">{selectedUserForPoints.username}</p>
+                  <div className="text-sm text-muted-foreground">사용자</div>
+                  <div className="font-medium">{selectedUserForPoints.name}</div>
+                  <div className="text-sm text-muted-foreground">{selectedUserForPoints.username}</div>
                 </div>
                 <div className="text-right">
                   <div className="text-sm text-muted-foreground">현재 포인트</div>
                   <div className="font-bold">{selectedUserForPoints.points.toLocaleString()}P</div>
                 </div>
               </div>
-              
+
               <div className="space-y-2">
-                <label className="text-sm font-medium">포인트 금액</label>
+                <Label>포인트 금액</Label>
                 <Input
                   type="number"
                   placeholder="금액 입력"
                   value={pointAmountForDialog}
                   onChange={(e) => setPointAmountForDialog(e.target.value)}
                 />
+                <p className="text-sm text-muted-foreground">
+                  * 차감 시 현재 잔액 이하로만 가능합니다.
+                </p>
+              </div>
+
+              <div className="flex space-x-2">
+                <Button
+                  variant="default"
+                  className="flex-1"
+                  onClick={() => handlePointManageFromDialog('add')}
+                >
+                  충전하기
+                </Button>
+                <Button
+                  variant="destructive"
+                  className="flex-1"
+                  onClick={() => handlePointManageFromDialog('subtract')}
+                  disabled={!pointAmountForDialog || parseInt(pointAmountForDialog) <= 0 || parseInt(pointAmountForDialog) > selectedUserForPoints.points}
+                >
+                  차감하기
+                </Button>
               </div>
             </div>
           )}
-          <DialogFooter className="flex space-x-2">
-            <Button
-              onClick={() => handlePointManageFromDialog("add")}
-              disabled={!pointAmountForDialog || parseInt(pointAmountForDialog) <= 0}
-            >
-              충전
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={() => handlePointManageFromDialog("subtract")}
-              disabled={Boolean(!pointAmountForDialog || 
-                parseInt(pointAmountForDialog) <= 0 || 
-                (selectedUserForPoints && parseInt(pointAmountForDialog) > selectedUserForPoints.points))}
-            >
-              차감
-            </Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

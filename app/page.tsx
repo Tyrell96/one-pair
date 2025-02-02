@@ -667,19 +667,15 @@ export default function HomePage() {
 
   return (
     <div className="container mx-auto sm:p-4 p-0">
-      <div className="flex flex-col sm:flex-row justify-end items-center mb-6 p-4 sm:p-0 border-b sm:border-0">
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center w-full sm:w-auto">
-          <div className="flex justify-end items-center space-x-2 w-full sm:w-auto">
-            <div className="flex flex-col sm:flex-row gap-2">
-              <Button
-                variant="outline"
-                onClick={() => setIsPointRequestOpen(true)}
-                className="w-full sm:w-auto"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                포인트 요청
-              </Button>
+      <div className="flex flex-col sm:flex-row justify-between items-center mb-6 p-4 sm:p-0 border-b sm:border-0">
+        <div className="flex items-center justify-between w-full mb-4 sm:mb-0">
+          {user && (
+            <div className="flex items-center space-x-2 px-3 py-2 rounded-full bg-primary/10">
+              <span className="font-medium text-sm">{user.name}</span>
+              <span className="font-medium">{user.points.toLocaleString()}P</span>
             </div>
+          )}
+          <div className="flex items-center space-x-2">
             <Button
               variant="outline"
               onClick={refreshPoints}
@@ -691,13 +687,8 @@ export default function HomePage() {
             </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="flex items-center justify-between space-x-2">
-                  {user && (
-                    <div className="flex items-center space-x-2 px-2 py-1 rounded-full bg-primary/10">
-                      <span className="font-medium text-sm">{user.name}</span>
-                      <span className="font-medium">{user.points.toLocaleString()}P</span>
-                    </div>
-                  )}
+                <Button variant="ghost" size="icon">
+                  <User className="h-5 w-5" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
@@ -726,6 +717,16 @@ export default function HomePage() {
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
+        </div>
+        <div className="flex w-full sm:w-auto space-x-2">
+          <Button
+            variant="outline"
+            onClick={() => setIsPointRequestOpen(true)}
+            className="flex-1 sm:flex-none"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            포인트 요청
+          </Button>
         </div>
       </div>
 

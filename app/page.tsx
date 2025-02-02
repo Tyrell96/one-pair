@@ -669,12 +669,7 @@ export default function HomePage() {
     <div className="container mx-auto sm:p-4 p-0">
       <div className="flex flex-col sm:flex-row justify-between items-center mb-6 p-4 sm:p-0 border-b sm:border-0">
         <div className="flex items-center justify-between w-full mb-4 sm:mb-0">
-          {user && (
-            <div className="flex items-center space-x-2 px-3 py-2 rounded-full bg-primary/10">
-              <span className="font-medium text-sm">{user.name}</span>
-              <span className="font-medium">{user.points.toLocaleString()}P</span>
-            </div>
-          )}
+          <h2 className="text-xl sm:text-2xl font-bold">One-Pair</h2>
           <div className="flex items-center space-x-2">
             <Button
               variant="outline"
@@ -685,48 +680,37 @@ export default function HomePage() {
               <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
               <span className="hidden sm:inline">새로고침</span>
             </Button>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon">
-                  <User className="h-5 w-5" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                {user && (
-                  <>
-                    <DropdownMenuItem onClick={() => router.push("/profile")}>
-                      <User className="mr-2 h-4 w-4" />
-                      프로필 수정
+            {user && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <div className="flex items-center space-x-2 px-3 py-2 rounded-full bg-primary/10 cursor-pointer hover:bg-primary/20">
+                    <span className="font-medium text-sm">{user.name}</span>
+                    <span className="font-medium">{user.points.toLocaleString()}P</span>
+                  </div>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuItem onClick={() => router.push("/profile")}>
+                    <User className="mr-2 h-4 w-4" />
+                    프로필 수정
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => router.push("/transactions")}>
+                    <History className="mr-2 h-4 w-4" />
+                    포인트 내역
+                  </DropdownMenuItem>
+                  {user.role === "ADMIN" && (
+                    <DropdownMenuItem onClick={() => router.push("/admin")}>
+                      <TrendingUp className="mr-2 h-4 w-4" />
+                      관리자
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => router.push("/transactions")}>
-                      <History className="mr-2 h-4 w-4" />
-                      포인트 내역
-                    </DropdownMenuItem>
-                    {user.role === "ADMIN" && (
-                      <DropdownMenuItem onClick={() => router.push("/admin")}>
-                        <TrendingUp className="mr-2 h-4 w-4" />
-                        관리자
-                      </DropdownMenuItem>
-                    )}
-                    <DropdownMenuItem onClick={handleLogout}>
-                      <LogOut className="mr-2 h-4 w-4" />
-                      로그아웃
-                    </DropdownMenuItem>
-                  </>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
+                  )}
+                  <DropdownMenuItem onClick={handleLogout}>
+                    <LogOut className="mr-2 h-4 w-4" />
+                    로그아웃
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
           </div>
-        </div>
-        <div className="flex w-full sm:w-auto space-x-2">
-          <Button
-            variant="outline"
-            onClick={() => setIsPointRequestOpen(true)}
-            className="flex-1 sm:flex-none"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            포인트 요청
-          </Button>
         </div>
       </div>
 
@@ -737,11 +721,11 @@ export default function HomePage() {
             <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 w-full sm:w-auto">
               <Button
                 variant="default"
-                onClick={() => router.push('/payment')}
+                onClick={() => setIsPointRequestOpen(true)}
                 className="w-full sm:w-auto"
               >
-                <DollarSign className="mr-2 h-4 w-4" />
-                딜러에게 포인트 전달
+                <Plus className="mr-2 h-4 w-4" />
+                포인트 요청
               </Button>
               <Button
                 variant="default"
@@ -750,6 +734,14 @@ export default function HomePage() {
               >
                 <Wallet className="mr-2 h-4 w-4" />
                 포인트 사용
+              </Button>
+              <Button
+                variant="default"
+                onClick={() => router.push('/payment')}
+                className="w-full sm:w-auto"
+              >
+                <DollarSign className="mr-2 h-4 w-4" />
+                딜러에게 포인트 전달
               </Button>
             </div>
           </div>

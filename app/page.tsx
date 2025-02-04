@@ -97,11 +97,8 @@ export default function HomePage() {
 
   const processPointHistory = useCallback((transactions: Transaction[]) => {
     const dailyMap = new Map<string, number>();
-
-    // 거래 내역을 날짜 기준으로 정렬 (과거순)
-    const sortedTransactions = [...transactions].sort((a, b) => 
-      new Date(a.date).getTime() - new Date(b.date).getTime()
-    );
+    const currentPoints = user?.points || 0;
+    const today = new Date().toISOString().split('T')[0];
 
     // 최근 7일 동안의 날짜 배열 생성
     const last7Days = Array.from({length: 7}, (_, i) => {
@@ -110,22 +107,32 @@ export default function HomePage() {
       return date.toISOString().split('T')[0];
     });
 
-    // 시작 포인트 (가장 오래된 거래 이전의 포인트)
-    let runningTotal = 0;
+    // 현재 포인트에서 거래 내역을 역순으로 계산
+    let runningTotal = currentPoints;
+    
+    // 최신 날짜부터 과거 순으로 정렬
+    const sortedTransactions = [...transactions].sort((a, b) => 
+      new Date(b.date).getTime() - new Date(a.date).getTime()
+    );
+
+    // 현재 포인트를 오늘 날짜에 저장
+    dailyMap.set(today, currentPoints);
 
     // 각 날짜별 최종 포인트 계산
-    last7Days.forEach(dateKey => {
+    last7Days.reverse().forEach(dateKey => {
+      if (dateKey === today) return; // 오늘 날짜는 이미 처리했으므로 스킵
+
       // 해당 날짜의 거래들
       const dayTransactions = sortedTransactions.filter(tx => 
         new Date(tx.date).toISOString().split('T')[0] === dateKey
       );
 
-      // 해당 날짜의 거래들을 시간순으로 처리
+      // 해당 날짜의 거래들을 시간 역순으로 처리
       dayTransactions.forEach(tx => {
         if (tx.type === "충전" || tx.type === "받기") {
-          runningTotal += tx.amount;
+          runningTotal -= tx.amount; // 과거로 갈수록 충전/받은 금액을 뺌
         } else if (tx.type === "출금" || tx.type === "사용" || tx.type === "전달") {
-          runningTotal = Math.max(0, runningTotal - tx.amount);
+          runningTotal += tx.amount; // 과거로 갈수록 출금/사용/전달 금액을 더함
         }
       });
 
@@ -133,23 +140,17 @@ export default function HomePage() {
       dailyMap.set(dateKey, runningTotal);
     });
 
-    // 마지막 날(오늘)은 현재 실제 포인트로 업데이트
-    if (last7Days.length > 0) {
-      dailyMap.set(last7Days[last7Days.length - 1], user?.points || 0);
-    }
-
-    // 일별 데이터 설정
+    // 날짜 순서대로 데이터 설정 (과거에서 현재로)
     setDailyPointData(
-      Array.from(dailyMap.entries())
-        .map(([date, points]) => ({
-          date,
-          points: Math.max(0, points),
-        }))
+      last7Days.reverse().map(date => ({
+        date,
+        points: Math.max(0, dailyMap.get(date) || 0),
+      }))
     );
 
-    // 포인트 내역 설정
+    // 포인트 내역 설정 (최신순)
     setPointHistory(
-      sortedTransactions.map(tx => ({
+      transactions.map(tx => ({
         id: tx.id,
         type: tx.type,
         amount: tx.amount,

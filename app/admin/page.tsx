@@ -61,7 +61,6 @@ interface SelectedUser {
 export default function AdminPage() {
   const router = useRouter();
   const { toast } = useToast();
-  const [isLoading, setIsLoading] = useState(true);
   const [users, setUsers] = useState<User[]>([]);
   const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
   const [userManageSearchQuery, setUserManageSearchQuery] = useState("");
@@ -83,6 +82,7 @@ export default function AdminPage() {
   const [selectedUserForPoints, setSelectedUserForPoints] = useState<SelectedUser | null>(null);
   const [pointAmountForDialog, setPointAmountForDialog] = useState("");
   const [currentAdmin, setCurrentAdmin] = useState<{ username: string } | null>(null);
+  const [activeSearchParams, setActiveSearchParams] = useState<{ type: string; query: string } | null>(null);
 
   // 사용자 목록 가져오기
   const fetchUsers = useCallback(async () => {
@@ -137,15 +137,18 @@ export default function AdminPage() {
     }
   }, [toast]);
 
-  const fetchTransactions = useCallback(async () => {
+  const fetchTransactions = useCallback(async (searchParams?: { type: string; query: string }) => {
     try {
       setIsLoadingTransactions(true);
       const token = localStorage.getItem("token");
       
       // 검색 조건을 쿼리 파라미터로 추가
       let url = `/api/admin/transactions?page=${currentTransactionPage}&pageSize=${transactionPageSize}`;
-      if (searchQuery && searchType !== "all") {
-        url += `&searchType=${searchType}&searchQuery=${searchQuery}`;
+      
+      // 활성화된 검색 조건이 있으면 사용
+      const activeParams = searchParams || activeSearchParams;
+      if (activeParams?.query && activeParams.query.trim() !== "") {
+        url += `&searchType=${activeParams.type}&searchQuery=${encodeURIComponent(activeParams.query)}`;
       }
 
       const response = await fetch(url, {
@@ -168,7 +171,7 @@ export default function AdminPage() {
     } finally {
       setIsLoadingTransactions(false);
     }
-  }, [currentTransactionPage, transactionPageSize, searchType, searchQuery, toast]);
+  }, [currentTransactionPage, transactionPageSize, activeSearchParams, toast]);
 
   // 현재 관리자 정보 가져오기
   const fetchCurrentAdmin = useCallback(async () => {
@@ -227,7 +230,6 @@ export default function AdminPage() {
 
   // 관리자 권한 토글
   const toggleAdminRole = async (userId: string, currentRole: boolean) => {
-    setIsLoading(true);
     try {
       const token = localStorage.getItem("token");
       const response = await fetch(`/api/users/${userId}/role`, {
@@ -256,8 +258,6 @@ export default function AdminPage() {
         description: error instanceof Error ? error.message : "권한 변경에 실패했습니다.",
         variant: "destructive",
       });
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -295,7 +295,6 @@ export default function AdminPage() {
   };
 
   const handleResetPassword = async (userId: string) => {
-    setIsLoading(true);
     try {
       const token = localStorage.getItem("token");
       const response = await fetch(`/api/users/${userId}`, {
@@ -321,15 +320,12 @@ export default function AdminPage() {
         description: error instanceof Error ? error.message : "비밀번호 초기화에 실패했습니다.",
         variant: "destructive",
       });
-    } finally {
-      setIsLoading(false);
     }
   };
 
   const handleDeleteUser = async (userId: string) => {
     if (!confirm("정말 이 사용자를 삭제하시겠습니까?")) return;
 
-    setIsLoading(true);
     try {
       const token = localStorage.getItem("token");
       const response = await fetch(`/api/users/${userId}`, {
@@ -354,13 +350,10 @@ export default function AdminPage() {
         description: error instanceof Error ? error.message : "사용자 삭제에 실패했습니다.",
         variant: "destructive",
       });
-    } finally {
-      setIsLoading(false);
     }
   };
 
   const toggleDealerStatus = async (userId: string, currentStatus: boolean) => {
-    setIsLoading(true);
     try {
       const token = localStorage.getItem("token");
       const response = await fetch(`/api/users/${userId}/dealer`, {
@@ -390,8 +383,6 @@ export default function AdminPage() {
         description: error instanceof Error ? error.message : "딜러 상태 변경에 실패했습니다.",
         variant: "destructive",
       });
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -474,20 +465,23 @@ export default function AdminPage() {
     }
   };
 
-  // 검색 핸들러
-  const handleTransactionSearch = (e: React.FormEvent) => {
+  // 검색 폼 제출 핸들러
+  const handleTransactionSearch = useCallback((e: React.FormEvent) => {
     e.preventDefault();
-    setCurrentTransactionPage(1);
-    fetchTransactions();
-  };
+    setCurrentTransactionPage(1); // 검색 시 첫 페이지로 이동
+    const newSearchParams = { type: searchType, query: searchQuery };
+    setActiveSearchParams(newSearchParams);
+    fetchTransactions(newSearchParams);
+  }, [fetchTransactions, searchType, searchQuery]);
 
   // 검색 초기화 핸들러
-  const resetTransactionSearch = () => {
+  const resetTransactionSearch = useCallback(() => {
     setSearchType("all");
     setSearchQuery("");
-    setCurrentTransactionPage(1);
-    fetchTransactions(); // 초기화 후 바로 검색 실행
-  };
+    setCurrentTransactionPage(1); // 초기화 시 첫 페이지로 이동
+    setActiveSearchParams(null);
+    fetchTransactions({ type: "all", query: "" }); // 빈 검색 조건으로 요청
+  }, [fetchTransactions]);
 
   // 페이지네이션 헬퍼 함수
   const getPaginatedData = <T,>(data: T[], currentPage: number, pageSize: number) => {
@@ -680,7 +674,6 @@ export default function AdminPage() {
                                 variant="outline"
                                 size="sm"
                                 onClick={() => handlePointRequest(request.id, "approved")}
-                                disabled={isLoading}
                               >
                                 <Check className="h-4 w-4 mr-2" />
                                 승인
@@ -689,7 +682,6 @@ export default function AdminPage() {
                                 variant="destructive"
                                 size="sm"
                                 onClick={() => handlePointRequest(request.id, "rejected")}
-                                disabled={isLoading}
                               >
                                 <X className="h-4 w-4 mr-2" />
                                 거절
@@ -727,7 +719,11 @@ export default function AdminPage() {
               <div className="space-y-4">
                 <div className="flex justify-between items-center">
                   <form onSubmit={handleTransactionSearch} className="flex flex-col sm:flex-row gap-2">
-                    <Select value={searchType} onValueChange={setSearchType}>
+                    <Select 
+                      value={searchType} 
+                      onValueChange={setSearchType}
+                      name="searchType"
+                    >
                       <SelectTrigger className="w-[180px]">
                         <SelectValue placeholder="검색 대상 선택" />
                       </SelectTrigger>
@@ -861,77 +857,79 @@ export default function AdminPage() {
                     <TableHead>이름</TableHead>
                     <TableHead>아이디</TableHead>
                     <TableHead>이메일</TableHead>
+                    <TableHead>딜러</TableHead>
                     <TableHead>포인트</TableHead>
                     <TableHead>포인트 관리</TableHead>
-                    <TableHead className="text-right">관리</TableHead>
+                    <TableHead>관리자</TableHead>
+                    <TableHead>작업</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredUsers.length > 0 ? (
-                    filteredUsers.map((user) => (
-                      <TableRow key={user.id}>
-                        <TableCell>{user.name}</TableCell>
-                        <TableCell>{user.username}</TableCell>
-                        <TableCell>{user.email}</TableCell>
-                        <TableCell>{user.points?.toLocaleString()}P</TableCell>
-                        <TableCell>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              setSelectedUserForPoints(user);
-                              setIsPointDialogOpen(true);
-                            }}
-                          >
-                            <Wallet className="h-4 w-4 mr-2" />
-                            포인트 관리
-                          </Button>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="sm">
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem
-                                onClick={() => toggleAdminRole(user.id, user.role === "ADMIN")}
-                              >
-                                <Shield className="mr-2 h-4 w-4" />
-                                {user.role === "ADMIN" ? "관리자 권한 해제" : "관리자 권한 부여"}
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={() => toggleDealerStatus(user.id, user.isDealer)}
-                              >
-                                <DollarSign className="mr-2 h-4 w-4" />
-                                {user.isDealer ? "딜러 해제" : "딜러 지정"}
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={() => handleResetPassword(user.id)}
-                              >
-                                <KeyRound className="mr-2 h-4 w-4" />
-                                비밀번호 초기화
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                className="text-red-600"
-                                onClick={() => handleDeleteUser(user.id)}
-                              >
-                                <Trash2 className="mr-2 h-4 w-4" />
-                                계정 삭제
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  ) : (
-                    <TableRow>
-                      <TableCell colSpan={6} className="text-center py-4">
-                        {isSearching ? "검색 결과가 없습니다." : "사용자가 없습니다."}
+                  {filteredUsers.map((user) => (
+                    <TableRow key={user.id}>
+                      <TableCell>{user.name}</TableCell>
+                      <TableCell>{user.username}</TableCell>
+                      <TableCell>{user.email}</TableCell>
+                      <TableCell>
+                        <Button
+                          variant={user.isDealer ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => toggleDealerStatus(user.id, user.isDealer)}
+                        >
+                          <DollarSign className="h-4 w-4 mr-2" />
+                          {user.isDealer ? "딜러" : "일반"}
+                        </Button>
+                      </TableCell>
+                      <TableCell>{user.points.toLocaleString()}P</TableCell>
+                      <TableCell>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedUserForPoints({
+                              id: user.id,
+                              name: user.name,
+                              username: user.username,
+                              points: user.points,
+                            });
+                            setIsPointDialogOpen(true);
+                          }}
+                        >
+                          <Wallet className="h-4 w-4 mr-2" />
+                          포인트 관리
+                        </Button>
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          variant={user.role === "ADMIN" ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => toggleAdminRole(user.id, user.role === "ADMIN")}
+                        >
+                          <Shield className="h-4 w-4 mr-2" />
+                          {user.role === "ADMIN" ? "관리자" : "일반"}
+                        </Button>
+                      </TableCell>
+                      <TableCell>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => handleResetPassword(user.id)}>
+                              <KeyRound className="h-4 w-4 mr-2" />
+                              비밀번호 초기화
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleDeleteUser(user.id)}>
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              사용자 삭제
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </TableCell>
                     </TableRow>
-                  )}
+                  ))}
                 </TableBody>
               </Table>
               <PaginationControls

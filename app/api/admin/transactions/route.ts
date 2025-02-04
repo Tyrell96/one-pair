@@ -6,8 +6,7 @@ export async function GET(request: Request) {
   try {
     // URL 파라미터 파싱
     const { searchParams } = new URL(request.url);
-    const search = searchParams.get('search');
-    const type = searchParams.get('type');
+    const searchQuery = searchParams.get('searchQuery');
     const searchType = searchParams.get('searchType') || 'all';
     const page = parseInt(searchParams.get('page') || '1');
     const pageSize = parseInt(searchParams.get('pageSize') || '10');
@@ -15,45 +14,41 @@ export async function GET(request: Request) {
     // 쿼리 조건 구성
     const where: Prisma.PointTransactionWhereInput = {};
 
-    if (search) {
+    if (searchQuery && searchQuery.trim() !== '') {
       if (searchType === 'sender') {
         where.sender = {
           OR: [
-            { name: { contains: search } },
-            { username: { contains: search } }
+            { name: { contains: searchQuery } },
+            { username: { contains: searchQuery } }
           ]
         };
       } else if (searchType === 'receiver') {
         where.receiver = {
           OR: [
-            { name: { contains: search } },
-            { username: { contains: search } }
+            { name: { contains: searchQuery } },
+            { username: { contains: searchQuery } }
           ]
         };
-      } else {
+      } else if (searchType === 'all') {
         where.OR = [
           {
             sender: {
               OR: [
-                { name: { contains: search } },
-                { username: { contains: search } }
+                { name: { contains: searchQuery } },
+                { username: { contains: searchQuery } }
               ]
             }
           },
           {
             receiver: {
               OR: [
-                { name: { contains: search } },
-                { username: { contains: search } }
+                { name: { contains: searchQuery } },
+                { username: { contains: searchQuery } }
               ]
             }
           }
         ];
       }
-    }
-
-    if (type && type !== 'all') {
-      where.type = type;
     }
 
     // 포인트 내역 조회 (User 테이블과 Join)

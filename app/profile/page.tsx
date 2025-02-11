@@ -1,35 +1,89 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { useRouter } from "next/navigation";
 import { User } from "lucide-react";
-import jwt from "jsonwebtoken";
 import { Label } from "@/components/ui/label";
+import { BottomNav } from "@/components/navigation/bottom-nav";
 
 interface UserProfile {
   id: string;
   name: string;
-  email: string;
+  nickname: string;
   points: number;
+  bankAccount: string;
   avatar?: string;
 }
+
+const initialProfile: UserProfile = {
+  id: '',
+  name: '',
+  nickname: '',
+  points: 0,
+  bankAccount: '',
+  avatar: '',
+};
 
 export default function ProfilePage() {
   const router = useRouter();
   const { toast } = useToast();
-  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [profile, setProfile] = useState<UserProfile>(initialProfile);
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const handleProfileUpdate = useCallback(async () => {
-    if (!profile) return;
+  const fetchProfile = useCallback(async () => {
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        router.push("/sign-in");
+        return;
+      }
+
+      const response = await fetch("/api/users/me", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error("프로필 정보를 불러올 수 없습니다.");
+      }
+
+      const data = await response.json();
+      setProfile({
+        id: data.id,
+        name: data.name,
+        nickname: data.nickname,
+        points: data.points,
+        bankAccount: data.bankAccount || "",
+        avatar: data.avatar,
+      });
+    } catch (error) {
+      console.error("프로필 로딩 에러:", error);
+      toast({
+        title: "오류",
+        description: "프로필 정보를 불러오는데 실패했습니다.",
+        variant: "destructive",
+      });
+      router.push("/sign-in");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [router, toast]);
+
+  useEffect(() => {
+    fetchProfile();
+  }, [fetchProfile]);
+
+  const handleProfileUpdate = async () => {
+    if (!profile.id) return;
 
     if (newPassword && newPassword !== confirmPassword) {
       toast({
@@ -42,15 +96,22 @@ export default function ProfilePage() {
 
     setIsLoading(true);
     try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        router.push("/sign-in");
+        return;
+      }
+
       const response = await fetch('/api/profile', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({
           id: profile.id,
-          name: profile.name,
-          email: profile.email,
+          nickname: profile.nickname,
+          bankAccount: profile.bankAccount,
           currentPassword: currentPassword || undefined,
           newPassword: newPassword || undefined,
         }),
@@ -70,41 +131,19 @@ export default function ProfilePage() {
       
       router.push('/');
     } catch (error) {
-      toast({
-        title: "오류",
-        description: error instanceof Error ? error.message : "프로필 업데이트 중 오류가 발생했습니다.",
-        variant: "destructive",
-      });
+      if (error instanceof Error) {
+        toast({
+          title: "오류",
+          description: error.message,
+          variant: "destructive",
+        });
+      }
     } finally {
       setIsLoading(false);
     }
-  }, [profile, newPassword, confirmPassword, currentPassword, toast, router]);
+  };
 
-  useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (!token) {
-      router.push("/sign-in");
-      return;
-    }
-
-    try {
-      const decoded = jwt.decode(token) as UserProfile;
-      if (decoded) {
-        setProfile({
-          id: decoded.id,
-          name: decoded.name,
-          email: decoded.email,
-          points: decoded.points,
-          avatar: decoded.avatar,
-        });
-      }
-    } catch (error) {
-      console.error("토큰 디코딩 에러:", error);
-      router.push("/sign-in");
-    }
-  }, [router]);
-
-  if (!profile) {
+  if (isLoading) {
     return (
       <div className="container mx-auto p-4">
         <div className="max-w-2xl mx-auto">
@@ -119,7 +158,7 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="container mx-auto p-4">
+    <div className="container mx-auto p-4 pb-20">
       <div className="max-w-2xl mx-auto">
         <Card>
           <CardHeader>
@@ -129,7 +168,7 @@ export default function ProfilePage() {
             {/* 프로필 이미지 섹션 */}
             <div className="flex flex-col items-center space-y-4">
               <Avatar className="h-24 w-24">
-                <AvatarImage src={profile.avatar} alt={profile.name} />
+                <AvatarImage src={profile.avatar} alt={profile.nickname} />
                 <AvatarFallback>
                   <User className="h-12 w-12" />
                 </AvatarFallback>
@@ -141,23 +180,27 @@ export default function ProfilePage() {
             <div className="space-y-4">
               <h3 className="font-semibold text-lg">기본 정보</h3>
               <div className="space-y-2">
-                <Input
-                  placeholder="이름"
-                  value={profile.name}
-                  onChange={(e) => setProfile({ ...profile, name: e.target.value })}
-                  disabled={isLoading}
-                />
                 <div className="space-y-2">
-                  <Label htmlFor="email">이메일</Label>
+                  <Label htmlFor="nickname">닉네임</Label>
                   <Input
-                    id="email"
-                    type="email"
-                    value={profile.email}
-                    disabled
-                    className="bg-muted"
+                    id="nickname"
+                    placeholder="닉네임"
+                    value={profile.nickname}
+                    onChange={(e) => setProfile({ ...profile, nickname: e.target.value })}
+                    disabled={isLoading}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="bankAccount">출금계좌번호</Label>
+                  <Input
+                    id="bankAccount"
+                    placeholder="출금계좌번호 (예: 000-000000-00-000)"
+                    value={profile.bankAccount}
+                    onChange={(e) => setProfile({ ...profile, bankAccount: e.target.value })}
+                    disabled={isLoading}
                   />
                   <p className="text-sm text-muted-foreground">
-                    이메일은 변경할 수 없습니다.
+                    포인트 출금시 사용될 계좌번호를 입력해주세요.
                   </p>
                 </div>
               </div>
@@ -167,27 +210,39 @@ export default function ProfilePage() {
             <div className="space-y-4">
               <h3 className="font-semibold text-lg">비밀번호 변경</h3>
               <div className="space-y-2">
-                <Input
-                  type="password"
-                  placeholder="현재 비밀번호"
-                  value={currentPassword}
-                  onChange={(e) => setCurrentPassword(e.target.value)}
-                  disabled={isLoading}
-                />
-                <Input
-                  type="password"
-                  placeholder="새 비밀번호"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  disabled={isLoading}
-                />
-                <Input
-                  type="password"
-                  placeholder="새 비밀번호 확인"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  disabled={isLoading}
-                />
+                <div className="space-y-2">
+                  <Label htmlFor="currentPassword">현재 비밀번호</Label>
+                  <Input
+                    id="currentPassword"
+                    type="password"
+                    placeholder="현재 비밀번호"
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                    disabled={isLoading}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="newPassword">새 비밀번호</Label>
+                  <Input
+                    id="newPassword"
+                    type="password"
+                    placeholder="새 비밀번호"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    disabled={isLoading}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="confirmPassword">새 비밀번호 확인</Label>
+                  <Input
+                    id="confirmPassword"
+                    type="password"
+                    placeholder="새 비밀번호 확인"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    disabled={isLoading}
+                  />
+                </div>
               </div>
             </div>
 
@@ -210,6 +265,7 @@ export default function ProfilePage() {
           </CardContent>
         </Card>
       </div>
+      <BottomNav />
     </div>
   );
 } 

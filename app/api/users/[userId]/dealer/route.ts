@@ -2,9 +2,7 @@ import { NextResponse, NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 
 interface RouteContext {
-  params: Promise<{
-    userId: string;
-  }>;
+  params: Promise<{ userId: string }>;
 }
 
 export async function PATCH(
@@ -13,17 +11,16 @@ export async function PATCH(
 ) {
   try {
     const params = await context.params;
-    const { userId } = params;
     const { isDealer } = await req.json();
 
     // 사용자 딜러 상태 업데이트
     const updatedUser = await prisma.user.update({
-      where: { id: userId },
+      where: { id: params.userId },
       data: { isDealer },
       select: {
         id: true,
+        username: true,
         name: true,
-        email: true,
         role: true,
         points: true,
         isDealer: true,

@@ -19,6 +19,7 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs";
+import { BottomNav } from "@/components/navigation/bottom-nav";
 
 interface User {
   id: string;
@@ -34,21 +35,17 @@ interface Transaction {
   amount: number;
   description: string;
   date: string;
-  sender?: {
-    name: string;
-    username: string;
-  };
-  receiver?: {
-    name: string;
-    username: string;
-  };
+  senderName: string;
+  senderUsername: string;
+  receiverName: string;
+  receiverUsername: string;
 }
 
 export default function TransactionsPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [pageSize, setPageSize] = useState("10");
   const [currentPage, setCurrentPage] = useState(1);
   const [totalTransactions, setTotalTransactions] = useState(0);
@@ -137,8 +134,16 @@ export default function TransactionsPage() {
     setCurrentPage(1);
   };
 
+  if (isLoading) {
+    return (
+      <div className="container mx-auto p-4">
+        <div className="text-center">로딩 중...</div>
+      </div>
+    );
+  }
+
   return (
-    <div className="container mx-auto sm:p-4 p-0">
+    <div className="container mx-auto p-4 pb-20">
       <div className="flex justify-between items-center mb-6 p-4 sm:p-0 border-b sm:border-0">
         <h1 className="text-xl sm:text-2xl font-bold">포인트 내역</h1>
         <div className="flex items-center space-x-2">
@@ -288,6 +293,8 @@ export default function TransactionsPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <BottomNav />
     </div>
   );
 } 

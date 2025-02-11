@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { type NextRequest } from "next/server";
 import jwt from "jsonwebtoken";
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
@@ -9,9 +10,18 @@ interface JwtPayload {
   role: string;
 }
 
-export async function GET(request: Request) {
+interface RouteContext {
+  params: Promise<{ id: string }>;
+}
+
+export async function PATCH(
+  request: NextRequest,
+  context: RouteContext
+) {
   try {
-    // 토큰 확인
+    const params = await context.params;
+    
+    // 토큰 검증
     const token = request.headers.get("Authorization")?.split(" ")[1];
     if (!token) {
       return NextResponse.json(
@@ -20,15 +30,8 @@ export async function GET(request: Request) {
       );
     }
 
-    // 토큰 검증
     const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload;
-    if (!decoded || !decoded.id) {
-      return NextResponse.json(
-        { error: "유효하지 않은 토큰입니다." },
-        { status: 401 }
-      );
-    }
-
+    
     // 관리자 권한 확인
     if (decoded.role !== "ADMIN") {
       return NextResponse.json(
@@ -37,25 +40,27 @@ export async function GET(request: Request) {
       );
     }
 
-    const users = await prisma.user.findMany({
+    const { isVisible } = await request.json();
+
+    // 공지사항 상태 업데이트
+    const notice = await prisma.notice.update({
+      where: { id: params.id },
+      data: { isVisible },
       select: {
         id: true,
-        username: true,
-        name: true,
-        role: true,
-        points: true,
-        createdAt: true,
-      },
-      orderBy: {
-        createdAt: 'desc',
+        title: true,
+        isVisible: true,
       },
     });
 
-    return NextResponse.json(users);
+    return NextResponse.json({
+      message: `공지사항이 ${isVisible ? '표시' : '숨김'} 처리되었습니다.`,
+      notice,
+    });
   } catch (error) {
-    console.error("사용자 목록 조회 에러:", error);
+    console.error("공지사항 상태 변경 에러:", error);
     return NextResponse.json(
-      { error: "사용자 목록을 불러올 수 없습니다." },
+      { error: "공지사항 상태를 변경할 수 없습니다." },
       { status: 500 }
     );
   }

@@ -29,33 +29,21 @@ export async function GET(request: Request) {
       );
     }
 
-    // 관리자 권한 확인
-    if (decoded.role !== "ADMIN") {
-      return NextResponse.json(
-        { error: "관리자만 접근할 수 있습니다." },
-        { status: 403 }
-      );
-    }
-
-    const users = await prisma.user.findMany({
-      select: {
-        id: true,
-        username: true,
-        name: true,
-        role: true,
-        points: true,
-        createdAt: true,
+    // 사용자의 포인트 요청 내역 조회
+    const requests = await prisma.pointRequest.findMany({
+      where: {
+        userId: decoded.id,
       },
       orderBy: {
         createdAt: 'desc',
       },
     });
 
-    return NextResponse.json(users);
+    return NextResponse.json(requests);
   } catch (error) {
-    console.error("사용자 목록 조회 에러:", error);
+    console.error("포인트 요청 내역 조회 에러:", error);
     return NextResponse.json(
-      { error: "사용자 목록을 불러올 수 없습니다." },
+      { error: "포인트 요청 내역을 불러올 수 없습니다." },
       { status: 500 }
     );
   }

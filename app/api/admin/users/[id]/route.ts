@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import jwt from "jsonwebtoken";
+import { type NextRequest } from "next/server";
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
 
@@ -9,8 +10,16 @@ interface JwtPayload {
   role: string;
 }
 
-export async function GET(request: Request) {
+interface RouteContext {
+  params: Promise<{ id: string }>;
+}
+
+export async function GET(
+  request: NextRequest,
+  context: RouteContext
+) {
   try {
+    const params = await context.params;
     // 토큰 확인
     const token = request.headers.get("Authorization")?.split(" ")[1];
     if (!token) {
@@ -37,25 +46,35 @@ export async function GET(request: Request) {
       );
     }
 
-    const users = await prisma.user.findMany({
+    // 사용자 정보 조회
+    const user = await prisma.user.findUnique({
+      where: { id: params.id },
       select: {
         id: true,
         username: true,
         name: true,
+        nickname: true,
+        phone: true,
+        bankAccount: true,
         role: true,
         points: true,
+        isDealer: true,
         createdAt: true,
-      },
-      orderBy: {
-        createdAt: 'desc',
       },
     });
 
-    return NextResponse.json(users);
+    if (!user) {
+      return NextResponse.json(
+        { error: "사용자를 찾을 수 없습니다." },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json(user);
   } catch (error) {
-    console.error("사용자 목록 조회 에러:", error);
+    console.error("사용자 정보 조회 에러:", error);
     return NextResponse.json(
-      { error: "사용자 목록을 불러올 수 없습니다." },
+      { error: "사용자 정보를 불러올 수 없습니다." },
       { status: 500 }
     );
   }

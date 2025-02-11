@@ -6,7 +6,7 @@ const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
 
 interface JwtPayload {
   id: string;
-  email: string;
+  username: string;
   name: string;
   role: string;
 }
@@ -39,10 +39,11 @@ export async function GET(request: Request) {
         id: true,
         username: true,
         name: true,
-        email: true,
+        nickname: true,
         role: true,
         points: true,
         isDealer: true,
+        avatar: true,
       },
     });
 

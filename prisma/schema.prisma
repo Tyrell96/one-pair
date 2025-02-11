@@ -17,9 +17,11 @@ datasource db {
 model User {
   id            String         @id @default(cuid())
   username      String        @unique
-  email         String        @unique
   password      String
   name          String
+  nickname      String        @unique @default("")
+  phone         String        @default("")
+  bankAccount   String        @default("")
   role          String        @default("USER")
   points        Int           @default(1000)
   avatar        String?
@@ -27,6 +29,7 @@ model User {
   pointRequests PointRequest[]
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
+  notices       Notice[]
 
   sentTransactions     PointTransaction[] @relation("Sender")
   receivedTransactions PointTransaction[] @relation("Receiver")
@@ -90,4 +93,19 @@ model Player {
   points    Int      @default(0)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model Notice {
+  id          String   @id @default(cuid())
+  title       String
+  content     String   @db.Text
+  isImportant Boolean  @default(false)
+  isVisible   Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  author      User     @relation(fields: [authorId], references: [id])
+  authorId    String
+
+  @@index([authorId])
+  @@index([createdAt])
 }

@@ -4,38 +4,45 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Shield, Check, X, DollarSign, MoreHorizontal, Trash2, UserPlus, Home, Wallet, KeyRound, User, History } from "lucide-react";
+import { 
+  ArrowLeft, DollarSign, History, Trash2, User, Wallet,
+  Check, X, MoreHorizontal, KeyRound 
+} from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 
 interface User {
+  isDealer: boolean;
   id: string;
-  name: string;
-  email: string;
   username: string;
+  name: string;
   role: string;
   points: number;
-  isDealer: boolean;
+  createdAt: string;
+  nickname: string;
+  bankAccount: string | null;
 }
 
 interface PointRequest {
   id: string;
-  userId: string;
-  user: {
-    name: string;
-    email: string;
-    username: string;
-    points: number;
-  };
-  type: 'charge' | 'withdraw';
+  type: string;
   amount: number;
-  status: 'pending' | 'approved' | 'rejected';
+  status: string;
+  user: {
+    id: string;
+    username: string;
+    name: string;
+    role: string;
+    points: number;
+    isDealer: boolean;
+  };
   createdAt: string;
 }
 
@@ -56,6 +63,12 @@ interface SelectedUser {
   name: string;
   username: string;
   points: number;
+  isDealer: boolean;
+}
+
+interface UserDetail extends User {
+  phone: string;
+  bankAccount: string;
 }
 
 export default function AdminPage() {
@@ -83,12 +96,14 @@ export default function AdminPage() {
   const [pointAmountForDialog, setPointAmountForDialog] = useState("");
   const [currentAdmin, setCurrentAdmin] = useState<{ username: string } | null>(null);
   const [activeSearchParams, setActiveSearchParams] = useState<{ type: string; query: string } | null>(null);
+  const [selectedUserDetail, setSelectedUserDetail] = useState<UserDetail | null>(null);
+  const [isUserDetailOpen, setIsUserDetailOpen] = useState(false);
 
   // 사용자 목록 가져오기
   const fetchUsers = useCallback(async () => {
     try {
       const token = localStorage.getItem("token");
-      const response = await fetch("/api/users", {
+      const response = await fetch("/api/admin/users", {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -109,7 +124,7 @@ export default function AdminPage() {
   const fetchPointRequests = useCallback(async () => {
     try {
       const token = localStorage.getItem("token");
-      const response = await fetch("/api/point-requests", {
+      const response = await fetch("/api/admin/point-requests", {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -591,6 +606,31 @@ export default function AdminPage() {
     );
   };
 
+  const handleViewUserDetail = async (userId: string) => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`/api/admin/users/${userId}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      
+      if (!response.ok) {
+        throw new Error("사용자 정보를 불러올 수 없습니다.");
+      }
+
+      const data = await response.json();
+      setSelectedUserDetail(data);
+      setIsUserDetailOpen(true);
+    } catch {
+      toast({
+        title: "오류",
+        description: "사용자 정보를 불러올 수 없습니다.",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <div className="container mx-auto sm:p-4 p-0">
       <div className="flex justify-between items-center mb-6 p-4 sm:p-0 border-b sm:border-0">
@@ -601,29 +641,29 @@ export default function AdminPage() {
             onClick={() => router.push("/")}
             className="flex items-center space-x-2"
           >
-            <Home className="h-4 w-4" />
-            <span className="hidden sm:inline">메인으로</span>
+            <ArrowLeft className="h-4 w-4" />
+            <span className="hidden sm:inline">홈으로</span>
           </Button>
         </div>
       </div>
 
-      <Tabs defaultValue="points" className="w-full">
-        <TabsList className="grid w-full grid-cols-3 mb-4">
-          <TabsTrigger value="points" className="text-sm sm:text-base">
-            <DollarSign className="mr-2 h-4 w-4" />
+      <Tabs defaultValue="point-requests">
+        <TabsList className="mb-4">
+          <TabsTrigger value="point-requests">
+            <DollarSign className="h-4 w-4 mr-2" />
             포인트 요청
           </TabsTrigger>
-          <TabsTrigger value="transactions" className="text-sm sm:text-base">
-            <History className="mr-2 h-4 w-4" />
+          <TabsTrigger value="transactions">
+            <History className="h-4 w-4 mr-2" />
             거래 내역
           </TabsTrigger>
-          <TabsTrigger value="users" className="text-sm sm:text-base">
-            <User className="mr-2 h-4 w-4" />
+          <TabsTrigger value="users">
+            <User className="h-4 w-4 mr-2" />
             사용자 관리
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="points">
+        <TabsContent value="point-requests">
           <Card>
             <CardHeader>
               <CardTitle>포인트 요청 관리</CardTitle>
@@ -840,10 +880,6 @@ export default function AdminPage() {
                     )}
                   </div>
                 </form>
-                <Button onClick={() => window.location.href = "/admin/users/create"}>
-                  <UserPlus className="mr-2 h-4 w-4" />
-                  계정 생성
-                </Button>
               </div>
               <PageSizeSelector
                 pageSize={userPageSize}
@@ -854,32 +890,31 @@ export default function AdminPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>이름</TableHead>
-                    <TableHead>아이디</TableHead>
-                    <TableHead>이메일</TableHead>
-                    <TableHead>딜러</TableHead>
+                    <TableHead>이름(닉네임)</TableHead>
+                    <TableHead>계좌번호</TableHead>
                     <TableHead>포인트</TableHead>
                     <TableHead>포인트 관리</TableHead>
+                    <TableHead>딜러</TableHead>
                     <TableHead>관리자</TableHead>
-                    <TableHead>작업</TableHead>
+                    <TableHead className="text-right">더보기</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredUsers.map((user) => (
                     <TableRow key={user.id}>
-                      <TableCell>{user.name}</TableCell>
-                      <TableCell>{user.username}</TableCell>
-                      <TableCell>{user.email}</TableCell>
                       <TableCell>
-                        <Button
-                          variant={user.isDealer ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => toggleDealerStatus(user.id, user.isDealer)}
+                        <button
+                          onClick={() => handleViewUserDetail(user.id)}
+                          className="text-left hover:underline"
                         >
-                          <DollarSign className="h-4 w-4 mr-2" />
-                          {user.isDealer ? "딜러" : "일반"}
-                        </Button>
+                          {user.name}
+                          <br />
+                          <span className="text-sm text-muted-foreground">
+                            {user.nickname}
+                          </span>
+                        </button>
                       </TableCell>
+                      <TableCell>{user.bankAccount || "-"}</TableCell>
                       <TableCell>{user.points.toLocaleString()}P</TableCell>
                       <TableCell>
                         <Button
@@ -891,25 +926,32 @@ export default function AdminPage() {
                               name: user.name,
                               username: user.username,
                               points: user.points,
+                              isDealer: user.isDealer,
                             });
                             setIsPointDialogOpen(true);
                           }}
                         >
                           <Wallet className="h-4 w-4 mr-2" />
-                          포인트 관리
+                          관리
                         </Button>
                       </TableCell>
                       <TableCell>
-                        <Button
-                          variant={user.role === "ADMIN" ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => toggleAdminRole(user.id, user.role === "ADMIN")}
-                        >
-                          <Shield className="h-4 w-4 mr-2" />
-                          {user.role === "ADMIN" ? "관리자" : "일반"}
-                        </Button>
+                        <Switch
+                          checked={user.isDealer}
+                          onCheckedChange={(checked) =>
+                            toggleDealerStatus(user.id, checked)
+                          }
+                        />
                       </TableCell>
                       <TableCell>
+                        <Switch
+                          checked={user.role === "ADMIN"}
+                          onCheckedChange={(checked) =>
+                            toggleAdminRole(user.id, checked)
+                          }
+                        />
+                      </TableCell>
+                      <TableCell className="text-right">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="sm">
@@ -991,6 +1033,50 @@ export default function AdminPage() {
                 >
                   차감하기
                 </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isUserDetailOpen} onOpenChange={setIsUserDetailOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>사용자 상세 정보</DialogTitle>
+          </DialogHeader>
+          {selectedUserDetail && (
+            <div className="grid gap-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>이름</Label>
+                  <div className="font-medium">{selectedUserDetail.name}</div>
+                </div>
+                <div>
+                  <Label>닉네임</Label>
+                  <div className="font-medium">{selectedUserDetail.nickname}</div>
+                </div>
+                <div>
+                  <Label>아이디</Label>
+                  <div className="font-medium">{selectedUserDetail.username}</div>
+                </div>
+                <div>
+                  <Label>연락처</Label>
+                  <div className="font-medium">{selectedUserDetail.phone}</div>
+                </div>
+                <div className="col-span-2">
+                  <Label>계좌번호</Label>
+                  <div className="font-medium">{selectedUserDetail.bankAccount}</div>
+                </div>
+                <div>
+                  <Label>가입일</Label>
+                  <div className="font-medium">
+                    {new Date(selectedUserDetail.createdAt).toLocaleDateString()}
+                  </div>
+                </div>
+                <div>
+                  <Label>포인트</Label>
+                  <div className="font-medium">{selectedUserDetail.points.toLocaleString()} P</div>
+                </div>
               </div>
             </div>
           )}

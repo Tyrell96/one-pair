@@ -68,13 +68,14 @@ export async function GET(request: Request) {
       );
     }
 
-    const requests = await prisma.pointRequest.findMany({
+    const pointRequests = await prisma.pointRequest.findMany({
       include: {
         user: {
           select: {
-            name: true,
-            email: true,
+            id: true,
             username: true,
+            name: true,
+            role: true,
             points: true,
           },
         },
@@ -84,7 +85,7 @@ export async function GET(request: Request) {
       },
     });
 
-    return NextResponse.json(requests);
+    return NextResponse.json(pointRequests);
   } catch (error) {
     console.error("포인트 요청 목록 조회 에러:", error);
     return NextResponse.json(

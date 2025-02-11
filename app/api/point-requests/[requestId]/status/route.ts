@@ -19,7 +19,17 @@ export async function POST(
     // 요청 정보 조회
     const pointRequest = await prisma.pointRequest.findUnique({
       where: { id: requestId },
-      include: { user: true },
+      include: {
+        user: {
+          select: {
+            id: true,
+            username: true,
+            name: true,
+            role: true,
+            points: true,
+          },
+        },
+      },
     });
 
     if (!pointRequest) {
@@ -81,7 +91,6 @@ export async function POST(
             select: {
               id: true,
               name: true,
-              email: true,
               points: true,
               role: true,
               avatar: true,

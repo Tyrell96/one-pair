@@ -2,31 +2,50 @@ import { NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
+import { type NextRequest } from "next/server";
 
-export async function POST(request: Request) {
+const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
+const JWT_EXPIRES_IN = "6h";
+
+interface LoginResponse {
+  token: string;
+  user: {
+    id: string;
+    username: string;
+    name: string;
+    nickname: string;
+    role: string;
+    points: number;
+    isDealer: boolean;
+    avatar?: string | null;
+  };
+}
+
+export async function POST(request: NextRequest): Promise<NextResponse<LoginResponse | { error: string }>> {
   try {
     const { username, password } = await request.json();
 
     // 필수 필드 검증
-    if (!username || !password) {
+    if (!username?.trim() || !password?.trim()) {
       return NextResponse.json(
         { error: "아이디와 비밀번호를 입력해주세요." },
         { status: 400 }
       );
     }
 
-    // 사용자 조회
+    // 사용자 조회 - 필요한 필드만 선택
     const user = await prisma.user.findUnique({
       where: { username },
       select: {
         id: true,
         username: true,
         name: true,
-        email: true,
+        nickname: true,
         role: true,
         points: true,
         isDealer: true,
         password: true,
+        avatar: true,
       }
     });
 
@@ -52,28 +71,31 @@ export async function POST(request: Request) {
       id: user.id,
       username: user.username,
       name: user.name,
-      email: user.email,
+      nickname: user.nickname,
       role: user.role,
       points: user.points,
-      isDealer: user.isDealer
+      isDealer: user.isDealer,
+      avatar: user.avatar,
     };
 
-    // JWT 토큰 생성
+    // JWT 토큰 생성 - 필요한 정보만 포함
     const token = jwt.sign(
       {
         id: user.id,
-        email: user.email,
-        name: user.name,
+        username: user.username,
         role: user.role,
       },
-      process.env.JWT_SECRET || "your-secret-key",
-      { expiresIn: "6h" }
+      JWT_SECRET,
+      { expiresIn: JWT_EXPIRES_IN }
     );
 
-    return NextResponse.json({
+    // 응답 데이터 구성
+    const response: LoginResponse = {
       token,
       user: userWithoutPassword
-    });
+    };
+
+    return NextResponse.json(response);
   } catch (error) {
     console.error("로그인 에러:", error);
     return NextResponse.json(
